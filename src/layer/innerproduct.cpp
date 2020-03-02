@@ -16,7 +16,8 @@
 #include <algorithm>
 #include "layer_type.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 DEFINE_LAYER_CREATOR(InnerProduct)
 
@@ -26,7 +27,7 @@ InnerProduct::InnerProduct()
     support_inplace = false;
 }
 
-int InnerProduct::load_param(const ParamDict& pd)
+int InnerProduct::load_param(const ParamDict &pd)
 {
     num_output = pd.get(0, 0);
     bias_term = pd.get(1, 0);
@@ -38,7 +39,7 @@ int InnerProduct::load_param(const ParamDict& pd)
     return 0;
 }
 
-int InnerProduct::load_model(const ModelBin& mb)
+int InnerProduct::load_model(const ModelBin &mb)
 {
     weight_data = mb.load(weight_data_size, 0);
     if (weight_data.empty())
@@ -60,7 +61,7 @@ int InnerProduct::load_model(const ModelBin& mb)
     return 0;
 }
 
-int InnerProduct::create_pipeline(const Option& opt)
+int InnerProduct::create_pipeline(const Option &opt)
 {
     // runtime quantize the weight data
     if (opt.use_int8_inference && weight_data.elemsize == (size_t)4u && int8_scale_term)
@@ -71,7 +72,7 @@ int InnerProduct::create_pipeline(const Option& opt)
 
         const int weight_data_size_output = weight_data_size / num_output;
 
-        for (int p=0; p<num_output; p++)
+        for (int p = 0; p < num_output; p++)
         {
             Option opt_q = opt;
             opt_q.blob_allocator = int8_weight_data.allocator;
@@ -87,7 +88,7 @@ int InnerProduct::create_pipeline(const Option& opt)
     return 0;
 }
 
-int InnerProduct::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int InnerProduct::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     if (opt.use_int8_inference && weight_data.elemsize == (size_t)1u)
     {
@@ -104,9 +105,9 @@ int InnerProduct::forward(const Mat& bottom_blob, Mat& top_blob, const Option& o
     if (top_blob.empty())
         return -100;
 
-    // num_output
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int p=0; p<num_output; p++)
+// num_output
+#pragma omp parallel for num_threads(opt.num_threads)
+    for (int p = 0; p < num_output; p++)
     {
         float sum = 0.f;
 
@@ -114,10 +115,10 @@ int InnerProduct::forward(const Mat& bottom_blob, Mat& top_blob, const Option& o
             sum = bias_data[p];
 
         // channels
-        for (int q=0; q<channels; q++)
+        for (int q = 0; q < channels; q++)
         {
-            const float* w = (const float*)weight_data + size * channels * p + size * q;
-            const float* m = bottom_blob.channel(q);
+            const float *w = (const float *)weight_data + size * channels * p + size * q;
+            const float *m = bottom_blob.channel(q);
 
             for (int i = 0; i < size; i++)
             {
@@ -154,7 +155,7 @@ int InnerProduct::forward(const Mat& bottom_blob, Mat& top_blob, const Option& o
     return 0;
 }
 
-int InnerProduct::forward_int8(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int InnerProduct::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     int w = bottom_blob.w;
     int h = bottom_blob.h;
@@ -175,19 +176,19 @@ int InnerProduct::forward_int8(const Mat& bottom_blob, Mat& top_blob, const Opti
     if (top_blob.empty())
         return -100;
 
-    // num_output
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int p=0; p<num_output; p++)
+// num_output
+#pragma omp parallel for num_threads(opt.num_threads)
+    for (int p = 0; p < num_output; p++)
     {
-        float* outptr = top_blob;
+        float *outptr = top_blob;
 
         int sum = 0;
 
         // channels
-        for (int q=0; q<channels; q++)
+        for (int q = 0; q < channels; q++)
         {
-            const signed char* w = (const signed char*)weight_data + size * channels * p + size * q;
-            const signed char* m = bottom_blob_tm.channel(q);
+            const signed char *w = (const signed char *)weight_data + size * channels * p + size * q;
+            const signed char *m = bottom_blob_tm.channel(q);
 
             for (int i = 0; i < size; i++)
             {
@@ -202,17 +203,19 @@ int InnerProduct::forward_int8(const Mat& bottom_blob, Mat& top_blob, const Opti
         else
             scale_in = 1.f / (bottom_blob_int8_scale * weight_data_int8_scales[p]);
 
-        float sumfp32 = sum * scale_in;
-
+        int32_t sum_int32 = sum;
         if (bias_term)
-            sumfp32 += bias_data[p];
+        {
+            const int32_t *bias = bias_data.channel(0);
+            sum_int32 += bias[p];
+        }
 
         if (activation_type == 1)
         {
-            sumfp32 = std::max(sumfp32, 0.f);
+            sum_int32 = std::max(sum_int32, 0);
         }
 
-        outptr[p] = sumfp32;
+        outptr[p] = sum_int32 * scale_in;
     }
 
     return 0;

@@ -17,7 +17,8 @@
 
 #include "platform.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 #if NCNN_VULKAN
 class VkAllocator;
@@ -41,20 +42,20 @@ public:
     int num_threads;
 
     // blob memory allocator
-    Allocator* blob_allocator;
+    Allocator *blob_allocator;
 
     // workspace memory allocator
-    Allocator* workspace_allocator;
+    Allocator *workspace_allocator;
 
 #if NCNN_VULKAN
     // blob memory allocator
-    VkAllocator* blob_vkallocator;
+    VkAllocator *blob_vkallocator;
 
     // workspace memory allocator
-    VkAllocator* workspace_vkallocator;
+    VkAllocator *workspace_vkallocator;
 
     // staging memory allocator
-    VkAllocator* staging_vkallocator;
+    VkAllocator *staging_vkallocator;
 #endif // NCNN_VULKAN
 
     // enable winograd convolution optimization
@@ -89,6 +90,8 @@ public:
     bool use_packing_layout;
 
     bool use_shader_pack8;
+
+    bool use_int32_storage;
 };
 
 } // namespace ncnn

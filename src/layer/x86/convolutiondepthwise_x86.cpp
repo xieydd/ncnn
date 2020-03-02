@@ -16,7 +16,8 @@
 
 #include "layer_type.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 #include "convolutiondepthwise_3x3.h"
 
@@ -29,7 +30,7 @@ ConvolutionDepthWise_x86::ConvolutionDepthWise_x86()
     activation = 0;
 }
 
-int ConvolutionDepthWise_x86::create_pipeline(const Option& opt)
+int ConvolutionDepthWise_x86::create_pipeline(const Option &opt)
 {
     if (activation_type == 1)
     {
@@ -43,7 +44,7 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option& opt)
         activation = ncnn::create_layer(ncnn::LayerType::ReLU);
 
         ncnn::ParamDict pd;
-        pd.set(0, activation_params[0]);// slope
+        pd.set(0, activation_params[0]); // slope
         activation->load_param(pd);
     }
     else if (activation_type == 3)
@@ -51,8 +52,8 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option& opt)
         activation = ncnn::create_layer(ncnn::LayerType::Clip);
 
         ncnn::ParamDict pd;
-        pd.set(0, activation_params[0]);// min
-        pd.set(1, activation_params[1]);// max
+        pd.set(0, activation_params[0]); // min
+        pd.set(1, activation_params[1]); // max
         activation->load_param(pd);
     }
     else if (activation_type == 4)
@@ -72,10 +73,10 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option& opt)
     const int maxk = kernel_w * kernel_h;
     int channels = (weight_data_size / group) / maxk / (num_output / group) * group;
 
-    for (int i=0; i<(int)group_ops.size(); i++)
+    for (int i = 0; i < (int)group_ops.size(); i++)
         delete group_ops[i];
 
-    group_ops.clear();      
+    group_ops.clear();
 
     if (channels == group && group == num_output)
     {
@@ -94,30 +95,30 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option& opt)
     const int channels_g = channels / group;
     const int num_output_g = num_output / group;
 
-    group_ops.resize(group);     
+    group_ops.resize(group);
 
-    for (int g=0; g<group; g++)
-    {  
+    for (int g = 0; g < group; g++)
+    {
         Mat weight_data_g = weight_data.range(maxk * channels_g * num_output_g * g, maxk * channels_g * num_output_g);
         Mat bias_data_g;
         if (bias_term)
             bias_data_g = bias_data.range(num_output_g * g, num_output_g);
 
-        ncnn::Layer* op = ncnn::create_layer(ncnn::LayerType::Convolution);
+        ncnn::Layer *op = ncnn::create_layer(ncnn::LayerType::Convolution);
 
         // set param
         ncnn::ParamDict pd;
-        pd.set(0, num_output_g);// num_output
+        pd.set(0, num_output_g); // num_output
         pd.set(1, kernel_w);
         pd.set(11, kernel_h);
         pd.set(2, dilation_w);
         pd.set(12, dilation_h);
         pd.set(3, stride_w);
         pd.set(13, stride_h);
-        pd.set(4, 0);// pad_w
-        pd.set(14, 0);// pad_h
+        pd.set(4, 0);  // pad_w
+        pd.set(14, 0); // pad_h
         pd.set(5, bias_term);
-        pd.set(6, maxk * channels_g * num_output_g);// weight_data_size
+        pd.set(6, maxk * channels_g * num_output_g); // weight_data_size
         pd.set(8, int8_scale_term);
         pd.set(9, activation_type);
         pd.set(10, activation_params);
@@ -134,7 +135,7 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option& opt)
             if (int8_scale_term)
             {
                 weights[2] = weight_data_int8_scales.range(g, 1);
-                weights[3] = bottom_blob_int8_scales.range(g, 1);     
+                weights[3] = bottom_blob_int8_scales.range(g, 1);
             }
 
             op->load_model(ModelBinFromMatArray(weights));
@@ -155,15 +156,15 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option& opt)
 
         op->create_pipeline(opt);
 
-//         op->use_int8_requantize = use_int8_requantize; FIXME
+        //         op->use_int8_requantize = use_int8_requantize; FIXME
 
         group_ops[g] = op;
-    }      
+    }
 
     return 0;
 }
 
-int ConvolutionDepthWise_x86::destroy_pipeline(const Option& opt)
+int ConvolutionDepthWise_x86::destroy_pipeline(const Option &opt)
 {
     if (activation)
     {
@@ -172,7 +173,7 @@ int ConvolutionDepthWise_x86::destroy_pipeline(const Option& opt)
         activation = 0;
     }
 
-    for (int i=0; i<(int)group_ops.size(); i++)
+    for (int i = 0; i < (int)group_ops.size(); i++)
     {
         group_ops[i]->destroy_pipeline(opt);
         delete group_ops[i];
@@ -182,7 +183,7 @@ int ConvolutionDepthWise_x86::destroy_pipeline(const Option& opt)
     return 0;
 }
 
-int ConvolutionDepthWise_x86::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int ConvolutionDepthWise_x86::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     // convolv with NxN kernel
     // value = value + bias
@@ -274,12 +275,12 @@ int ConvolutionDepthWise_x86::forward(const Mat& bottom_blob, Mat& top_blob, con
     const int channels_g = channels / group;
     const int num_output_g = num_output / group;
 
-    for (int g=0; g<group; g++)
+    for (int g = 0; g < group; g++)
     {
         const Mat bottom_blob_bordered_g = bottom_blob_bordered.channel_range(channels_g * g, channels_g);
         Mat top_blob_g = top_blob.channel_range(num_output_g * g, num_output_g);
 
-        const ncnn::Layer* op = group_ops[g];
+        const ncnn::Layer *op = group_ops[g];
 
         Option opt_g = opt;
         opt_g.blob_allocator = top_blob.allocator;
@@ -291,7 +292,7 @@ int ConvolutionDepthWise_x86::forward(const Mat& bottom_blob, Mat& top_blob, con
     return 0;
 }
 
-int ConvolutionDepthWise_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     int w = bottom_blob.w;
     int h = bottom_blob.h;
@@ -310,9 +311,9 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_
 
         const int channels_g = channels / group;
 
-        // quantize, scale and round to nearest
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int g=0; g<group; g++)
+// quantize, scale and round to nearest
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int g = 0; g < group; g++)
         {
             Option opt_g = opt;
             opt_g.num_threads = 1;
@@ -376,7 +377,7 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_
         if (use_int8_requantize)
         {
             std::vector<float> requantize_scales;
-            for (int g=0; g<group; g++)
+            for (int g = 0; g < group; g++)
             {
                 float scale_in;
                 if (weight_data_int8_scales[g] == 0)
@@ -416,7 +417,7 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_
         else
         {
             std::vector<float> dequantize_scales;
-            for (int g=0; g<group; g++)
+            for (int g = 0; g < group; g++)
             {
                 float top_rescale = 1.f / (bottom_blob_int8_scales[g] * weight_data_int8_scales[g]);
 
@@ -425,6 +426,7 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_
 
             if (kernel_w == 3 && kernel_h == 3 && stride_w == 1 && stride_h == 1 && dilation_w == 1 && dilation_h == 1)
             {
+                // fprintf(stdout,"1\n");
                 convdw3x3s1_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, dequantize_scales, opt);
 
                 if (activation)
@@ -436,6 +438,7 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_
             }
             if (kernel_w == 3 && kernel_h == 3 && stride_w == 2 && stride_h == 2 && dilation_w == 1 && dilation_h == 1)
             {
+                // fprintf(stdout,"2\n");
                 convdw3x3s2_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, dequantize_scales, opt);
 
                 if (activation)
@@ -452,13 +455,13 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat& bottom_blob, Mat& top_
     const int channels_g = channels / group;
     const int num_output_g = num_output / group;
 
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int g=0; g<group; g++)
+#pragma omp parallel for num_threads(opt.num_threads)
+    for (int g = 0; g < group; g++)
     {
         const Mat bottom_blob_bordered_g = bottom_blob_bordered.channel_range(channels_g * g, channels_g);
         Mat top_blob_g = top_blob.channel_range(num_output_g * g, num_output_g);
 
-        const ncnn::Layer* op = group_ops[g];
+        const ncnn::Layer *op = group_ops[g];
 
         Option opt_g = opt;
         opt_g.blob_allocator = top_blob.allocator;

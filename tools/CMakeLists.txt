@@ -1,7 +1,6 @@
-
-add_subdirectory(caffe)
-add_subdirectory(mxnet)
-add_subdirectory(onnx)
+#add_subdirectory(caffe)
+#add_subdirectory(mxnet)
+#add_subdirectory(onnx)
 
 add_subdirectory(quantize)
 

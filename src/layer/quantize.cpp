@@ -16,7 +16,8 @@
 
 #include <math.h>
 
-namespace ncnn {
+namespace ncnn
+{
 
 DEFINE_LAYER_CREATOR(Quantize)
 
@@ -26,7 +27,7 @@ Quantize::Quantize()
     support_inplace = false;
 }
 
-int Quantize::load_param(const ParamDict& pd)
+int Quantize::load_param(const ParamDict &pd)
 {
     scale = pd.get(0, 1.f);
 
@@ -36,12 +37,30 @@ int Quantize::load_param(const ParamDict& pd)
 static inline signed char float2int8(float v)
 {
     int int32 = static_cast<int>(round(v));
-    if (int32 > 127) return 127;
-    if (int32 < -127) return -127;
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
     return (signed char)int32;
 }
 
-int Quantize::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+static inline int32_t float2int32(float v)
+{
+    int32_t int32 = static_cast<int32_t>(round(v));
+    return int32;
+}
+
+// This function will cause bigger error than function above
+//#include <stdint.h>
+// static inline int32_t float2int32(float x)
+// {
+//     //取得符号位，设置掩码
+//     uint32_t n = ((*(uint32_t *)&x) & 0x80000000) ? 0xFFC00000 : 0; //一个三元操作符，直接储存掩码
+//     x += 12582912.0f;                                               //魔法数字加法
+//     return ((*(uint32_t *)&x) & 0x3FFFFF) | n;                      //直接or运算
+// }
+
+int Quantize::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     int dims = bottom_blob.dims;
 
@@ -49,17 +68,37 @@ int Quantize::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) 
     {
         int w = bottom_blob.w;
 
-        top_blob.create(w, (size_t)1u, opt.blob_allocator);
+        if (opt.use_int32_storage)
+        {
+            top_blob.create(w, (size_t)4u, opt.blob_allocator);
+        }
+        else
+        {
+            top_blob.create(w, (size_t)1u, opt.blob_allocator);
+        }
+
         if (top_blob.empty())
             return -100;
 
-        const float* ptr = bottom_blob;
-        signed char* outptr = top_blob;
+        const float *ptr = bottom_blob;
 
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int i=0; i<w; i++)
+        if (opt.use_int32_storage)
         {
-            outptr[i] = float2int8(ptr[i] * scale);
+            int32_t *outptr = top_blob;
+#pragma omp parallel for num_threads(opt.num_threads)
+            for (int i = 0; i < w; i++)
+            {
+                outptr[i] = float2int32(ptr[i] * scale);
+            }
+        }
+        else
+        {
+            signed char *outptr = top_blob;
+#pragma omp parallel for num_threads(opt.num_threads)
+            for (int i = 0; i < w; i++)
+            {
+                outptr[i] = float2int8(ptr[i] * scale);
+            }
         }
     }
 
@@ -73,11 +112,11 @@ int Quantize::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) 
         if (top_blob.empty())
             return -100;
 
-        const float* ptr = bottom_blob;
-        signed char* outptr = top_blob;
+        const float *ptr = bottom_blob;
+        signed char *outptr = top_blob;
 
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int i=0; i<size; i++)
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int i = 0; i < size; i++)
         {
             outptr[i] = float2int8(ptr[i] * scale);
         }
@@ -94,13 +133,13 @@ int Quantize::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) 
         if (top_blob.empty())
             return -100;
 
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int q=0; q<channels; q++)
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int q = 0; q < channels; q++)
         {
-            const float* ptr = bottom_blob.channel(q);
-            signed char* outptr = top_blob.channel(q);
+            const float *ptr = bottom_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
-            for (int i=0; i<size; i++)
+            for (int i = 0; i < size; i++)
             {
                 outptr[i] = float2int8(ptr[i] * scale);
             }

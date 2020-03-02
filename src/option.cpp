@@ -15,7 +15,8 @@
 #include "option.h"
 #include "cpu.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 Option::Option()
 {
@@ -33,12 +34,13 @@ Option::Option()
     use_winograd_convolution = true;
     use_sgemm_convolution = true;
     use_int8_inference = true;
-    use_vulkan_compute = false;// TODO enable me
+    use_vulkan_compute = false; // TODO enable me
 
     use_fp16_packed = true;
     use_fp16_storage = true;
     use_fp16_arithmetic = false;
     use_int8_storage = true;
+    use_int32_storage = false;
     use_int8_arithmetic = false;
 
     use_packing_layout = false;
