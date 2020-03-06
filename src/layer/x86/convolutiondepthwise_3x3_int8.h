@@ -301,7 +301,8 @@ static void convdw3x3s1_int8_requant_sse(const Mat &bottom_blob, Mat &top_blob, 
     int outch = top_blob.c;
 
     const signed char *kernel = _kernel;
-    const float *bias = _bias;
+    // const float *bias = _bias;
+    const int32_t *bias = _bias;
 
 #pragma omp parallel for num_threads(opt.num_threads)
     for (int p = 0; p < outch; p++)
@@ -309,7 +310,8 @@ static void convdw3x3s1_int8_requant_sse(const Mat &bottom_blob, Mat &top_blob, 
         Mat out = top_blob.channel(p);
         signed char *outptr = out;
 
-        const float bias0 = bias ? bias[p] : 0.f;
+        // const float bias0 = bias ? bias[p] : 0.f;
+        const int32_t bias0 = bias ? bias[p] : 0;
         const float scale_requant_in = scales_requant[2 * p];
         const float scale_requant_out = scales_requant[2 * p + 1];
 
@@ -339,7 +341,7 @@ static void convdw3x3s1_int8_requant_sse(const Mat &bottom_blob, Mat &top_blob, 
                 sum += (int)r2[1] * (int)kernel0[7];
                 sum += (int)r2[2] * (int)kernel0[8];
 
-                *outptr = float2int8(((float)sum * scale_requant_in + bias0) * scale_requant_out);
+                *outptr = float2int8((sum + bias0) * scale_requant_in * scale_requant_out);
 
                 r0++;
                 r1++;
@@ -367,7 +369,8 @@ static void convdw3x3s2_int8_requant_sse(const Mat &bottom_blob, Mat &top_blob, 
     const int tailstep = w - 2 * outw + w;
 
     const signed char *kernel = _kernel;
-    const float *bias = _bias;
+    // const float *bias = _bias;
+    const int32_t *bias = _bias;
 
 #pragma omp parallel for num_threads(opt.num_threads)
     for (int p = 0; p < outch; p++)
@@ -375,7 +378,8 @@ static void convdw3x3s2_int8_requant_sse(const Mat &bottom_blob, Mat &top_blob, 
         Mat out = top_blob.channel(p);
         signed char *outptr = out;
 
-        const float bias0 = bias ? bias[p] : 0.f;
+        // const float bias0 = bias ? bias[p] : 0.f;
+        const int32_t bias0 = bias ? bias[p] : 0;
         const float scale_requant_in = scales_requant[2 * p];
         const float scale_requant_out = scales_requant[2 * p + 1];
 
@@ -406,7 +410,7 @@ static void convdw3x3s2_int8_requant_sse(const Mat &bottom_blob, Mat &top_blob, 
                 sum += (int)r2[1] * (int)kernel0[7];
                 sum += (int)r2[2] * (int)kernel0[8];
 
-                *outptr = float2int8(((float)sum * scale_requant_in + bias0) * scale_requant_out);
+                *outptr = float2int8((sum + bias0) * scale_requant_in * scale_requant_out);
 
                 r0 += 2;
                 r1 += 2;

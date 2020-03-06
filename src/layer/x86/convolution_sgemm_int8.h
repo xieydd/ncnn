@@ -930,7 +930,8 @@ static void conv_im2col_sgemm_int8_requant_sse(const Mat &bottom_blob, Mat &top_
     int outch = top_blob.c;
 
     const signed char *kernel = _kernel;
-    const float *bias = _bias;
+    // const float *bias = _bias;
+    const int32_t *bias = _bias;
 
     // im2row
     Mat bottom_im2row(kernel_h * kernel_w * inch, outw * outh, 1UL, opt.workspace_allocator);
@@ -1151,10 +1152,15 @@ static void conv_im2col_sgemm_int8_requant_sse(const Mat &bottom_blob, Mat &top_
             signed char *output2 = top_blob.channel(i + 2);
             signed char *output3 = top_blob.channel(i + 3);
 
-            const float bias0 = bias ? bias[i] : 0.f;
-            const float bias1 = bias ? bias[i + 1] : 0.f;
-            const float bias2 = bias ? bias[i + 2] : 0.f;
-            const float bias3 = bias ? bias[i + 3] : 0.f;
+            // const float bias0 = bias ? bias[i] : 0.f;
+            // const float bias1 = bias ? bias[i + 1] : 0.f;
+            // const float bias2 = bias ? bias[i + 2] : 0.f;
+            // const float bias3 = bias ? bias[i + 3] : 0.f;
+
+            const int32_t bias0 = bias ? bias[i] : 0;
+            const int32_t bias1 = bias ? bias[i + 1] : 0;
+            const int32_t bias2 = bias ? bias[i + 2] : 0;
+            const int32_t bias3 = bias ? bias[i + 3] : 0;
 
             const float scale_requant_in0 = scale_requant[2 * i];
             const float scale_requant_out0 = scale_requant[2 * i + 1];
@@ -1215,10 +1221,14 @@ static void conv_im2col_sgemm_int8_requant_sse(const Mat &bottom_blob, Mat &top_
 
                 for (int n = 0; n < 4; n++)
                 {
-                    output0[n] = float2int8(((float)sum0[n] * scale_requant_in0 + bias0) * scale_requant_out0);
-                    output1[n] = float2int8(((float)sum1[n] * scale_requant_in1 + bias1) * scale_requant_out1);
-                    output2[n] = float2int8(((float)sum2[n] * scale_requant_in2 + bias2) * scale_requant_out2);
-                    output3[n] = float2int8(((float)sum3[n] * scale_requant_in3 + bias3) * scale_requant_out3);
+                    // output0[n] = float2int8(((float)sum0[n] * scale_requant_in0 + bias0) * scale_requant_out0);
+                    // output1[n] = float2int8(((float)sum1[n] * scale_requant_in1 + bias1) * scale_requant_out1);
+                    // output2[n] = float2int8(((float)sum2[n] * scale_requant_in2 + bias2) * scale_requant_out2);
+                    // output3[n] = float2int8(((float)sum3[n] * scale_requant_in3 + bias3) * scale_requant_out3);
+                    output0[n] = float2int8((sum0[n] + bias0) * scale_requant_in0 * scale_requant_out0);
+                    output1[n] = float2int8((sum1[n] + bias1) * scale_requant_in1 * scale_requant_out1);
+                    output2[n] = float2int8((sum2[n] + bias2) * scale_requant_in2 * scale_requant_out2);
+                    output3[n] = float2int8((sum3[n] + bias3) * scale_requant_in3 * scale_requant_out3);
                 }
                 output0 += 4;
                 output1 += 4;
@@ -1267,10 +1277,14 @@ static void conv_im2col_sgemm_int8_requant_sse(const Mat &bottom_blob, Mat &top_
                     vb += 1;
                 }
 
-                output0[0] = float2int8(((float)sum0 * scale_requant_in0 + bias0) * scale_requant_out0);
-                output1[0] = float2int8(((float)sum1 * scale_requant_in1 + bias1) * scale_requant_out1);
-                output2[0] = float2int8(((float)sum2 * scale_requant_in2 + bias2) * scale_requant_out2);
-                output3[0] = float2int8(((float)sum3 * scale_requant_in3 + bias3) * scale_requant_out3);
+                // output0[0] = float2int8(((float)sum0 * scale_requant_in0 + bias0) * scale_requant_out0);
+                // output1[0] = float2int8(((float)sum1 * scale_requant_in1 + bias1) * scale_requant_out1);
+                // output2[0] = float2int8(((float)sum2 * scale_requant_in2 + bias2) * scale_requant_out2);
+                // output3[0] = float2int8(((float)sum3 * scale_requant_in3 + bias3) * scale_requant_out3);
+                output0[0] = float2int8((sum0 + bias0) * scale_requant_in0 * scale_requant_out0);
+                output1[0] = float2int8((sum1 + bias1) * scale_requant_in1 * scale_requant_out1);
+                output2[0] = float2int8((sum2 + bias2) * scale_requant_in2 * scale_requant_out2);
+                output3[0] = float2int8((sum3 + bias3) * scale_requant_in3 * scale_requant_out3);
 
                 output0++;
                 output1++;
@@ -1284,7 +1298,8 @@ static void conv_im2col_sgemm_int8_requant_sse(const Mat &bottom_blob, Mat &top_
         {
             signed char *output = top_blob.channel(i);
 
-            const float bias0 = bias ? bias[i] : 0.f;
+            // const float bias0 = bias ? bias[i] : 0.f;
+            const int32_t bias0 = bias ? bias[i] : 0;
 
             const float scale_requant_in0 = scale_requant[2 * i];
             const float scale_requant_out0 = scale_requant[2 * i + 1];
@@ -1320,7 +1335,8 @@ static void conv_im2col_sgemm_int8_requant_sse(const Mat &bottom_blob, Mat &top_
 
                 for (int n = 0; n < 4; n++)
                 {
-                    output[n] = float2int8(((float)sum[n] * scale_requant_in0 + bias0) * scale_requant_out0);
+                    //output[n] = float2int8(((float)sum[n] * scale_requant_in0 + bias0) * scale_requant_out0);
+                    output[n] = float2int8((sum[n] + bias0) * scale_requant_in0 * scale_requant_out0);
                 }
                 output += 4;
             }
@@ -1339,7 +1355,8 @@ static void conv_im2col_sgemm_int8_requant_sse(const Mat &bottom_blob, Mat &top_
                     va += 1;
                     vb += 1;
                 }
-                output[0] = float2int8(((float)sum * scale_requant_in0 + bias0) * scale_requant_out0);
+                // output[0] = float2int8(((float)sum * scale_requant_in0 + bias0) * scale_requant_out0);
+                output[0] = float2int8((sum + bias0) * scale_requant_in0 * scale_requant_out0);
 
                 output++;
             }
