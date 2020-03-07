@@ -730,6 +730,129 @@ int Net::fuse_network()
     {
         Layer *layer = layers[i];
 
+        // if (layer->type == "Convolution" || layer->type == "ConvolutionDepthWise")
+        // {
+        //     if (layer->type == "Convolution" && (((Convolution *)layer)->weight_data.elemsize != 1u))
+        //         continue;
+        //     if (layer->type == "ConvolutionDepthWise" && (((ConvolutionDepthWise *)layer)->weight_data.elemsize != 1u))
+        //         continue;
+
+        //     for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
+        //     {
+        //         int layer_next_index = blobs[layer->tops[0]].consumers[n];
+        //         Layer *layer_next = layers[layer_next_index];
+
+        //         if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise")
+        //         {
+        //             if (layer_next->type == "Convolution" && ((Convolution *)layer_next)->weight_data.elemsize != 1u)
+        //                 continue;
+        //             if (layer_next->type == "ConvolutionDepthWise" && ((ConvolutionDepthWise *)layer_next)->weight_data.elemsize != 1u)
+        //                 continue;
+
+        //             // fprintf(stderr, "%s, %s\n", layer->name.c_str(), layer_next->name.c_str());
+        //             if (layer->type == "Convolution" && layer_next->type == "Convolution")
+        //             {
+        //                 ((Convolution *)layer)->use_int8_requantize = true;
+        //                 ((Convolution *)layer)->top_blob_int8_scale = ((Convolution *)layer_next)->bottom_blob_int8_scale;
+        //             }
+        //             else if (layer->type == "ConvolutionDepthWise" && layer_next->type == "Convolution")
+        //             {
+        //                 ((ConvolutionDepthWise *)layer)->use_int8_requantize = true;
+        //                 ((ConvolutionDepthWise *)layer)->top_blob_int8_scale = ((Convolution *)layer_next)->bottom_blob_int8_scale;
+        //             }
+        //             else if (layer->type == "Convolution" && layer_next->type == "ConvolutionDepthWise")
+        //             {
+        //                 ((Convolution *)layer)->use_int8_requantize = true;
+        //                 ((Convolution *)layer)->top_blob_int8_scale = ((ConvolutionDepthWise *)layer_next)->bottom_blob_int8_scales[0];
+        //             }
+        //             else
+        //             {
+        //                 ((ConvolutionDepthWise *)layer)->use_int8_requantize = true;
+        //                 ((ConvolutionDepthWise *)layer)->top_blob_int8_scale = ((ConvolutionDepthWise *)layer_next)->bottom_blob_int8_scales[0];
+        //             }
+        //         }
+        //         else if (layer_next->type == "ReLU")
+        //         {
+        //             int layer_next_2_index = blobs[layer_next->tops[0]].consumers[0];
+        //             Layer *layer_next_2 = layers[layer_next_2_index];
+
+        //             if (layer_next_2->type == "Convolution" || layer_next_2->type == "ConvolutionDepthWise")
+        //             {
+        //                 if (layer_next_2->type == "Convolution" && ((Convolution *)layer_next_2)->weight_data.elemsize != 1u)
+        //                     continue;
+        //                 if (layer_next_2->type == "ConvolutionDepthWise" && ((ConvolutionDepthWise *)layer_next_2)->weight_data.elemsize != 1u)
+        //                     continue;
+
+        //                 fprintf(stderr, "%s, %s, %s\n", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str());
+        //                 if (layer->type == "Convolution" && layer_next_2->type == "Convolution")
+        //                 {
+        //                     ((Convolution *)layer)->use_int8_requantize = true;
+        //                     ((Convolution *)layer)->top_blob_int8_scale = ((Convolution *)layer_next_2)->bottom_blob_int8_scale;
+        //                 }
+        //                 else if (layer->type == "ConvolutionDepthWise" && layer_next_2->type == "Convolution")
+        //                 {
+        //                     ((ConvolutionDepthWise *)layer)->use_int8_requantize = true;
+        //                     ((ConvolutionDepthWise *)layer)->top_blob_int8_scale = ((Convolution *)layer_next_2)->bottom_blob_int8_scale;
+        //                 }
+        //                 else if (layer->type == "Convolution" && layer_next_2->type == "ConvolutionDepthWise")
+        //                 {
+        //                     ((Convolution *)layer)->use_int8_requantize = true;
+        //                     ((Convolution *)layer)->top_blob_int8_scale = ((ConvolutionDepthWise *)layer_next_2)->bottom_blob_int8_scales[0];
+        //                 }
+        //                 else
+        //                 {
+        //                     ((ConvolutionDepthWise *)layer)->use_int8_requantize = true;
+        //                     ((ConvolutionDepthWise *)layer)->top_blob_int8_scale = ((ConvolutionDepthWise *)layer_next_2)->bottom_blob_int8_scales[0];
+        //                 }
+        //             }
+        //             else if (layer_next_2->type == "Split")
+        //             {
+        //                 bool all_conv = true;
+        //                 for (size_t i = 0; i < layer_next_2->tops.size(); i++)
+        //                 {
+        //                     int layer_next_3_index = blobs[layer_next_2->tops[i]].consumers[0];
+        //                     if (layers[layer_next_3_index]->type != "Convolution" && layers[layer_next_3_index]->type != "ConvolutionDepthWise" && layers[layer_next_3_index]->type != "PriorBox")
+        //                     {
+        //                         // fprintf(stderr, "%s, %s, %s, %s\n", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str(), layers[layer_next_3_index]->name.c_str());
+        //                         all_conv = false;
+        //                     }
+        //                 }
+
+        //                 if (all_conv == true && layer_next_2->tops.size() >= size_t(2))
+        //                 {
+        //                     // fprintf(stderr, "%s, %s, %s, ", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str());
+        //                     for (size_t i = 0; i < layer_next_2->tops.size(); i++)
+        //                     {
+        //                         int layer_next_3_index = blobs[layer_next_2->tops[i]].consumers[0];
+        //                         Layer *layer_next_3 = layers[layer_next_3_index];
+
+        //                         // fprintf(stderr, "%s, ", layer_next_3->name.c_str());
+        //                         if (layer_next_3->type == "Convolution")
+        //                         {
+        //                             ((Convolution *)layer)->top_blob_int8_scale = ((Convolution *)layer_next_3)->bottom_blob_int8_scale;
+        //                         }
+        //                     }
+
+        //                     ((Convolution *)layer)->use_int8_requantize = true;
+        //                     // fprintf(stderr, "\n");
+        //                 }
+        //             }
+        //             else
+        //             {
+        //                 // fprintf(stderr, "%s, %s\n", layer->name.c_str(), layer_next->name.c_str());
+        //             }
+        //         }
+        //         else if (layer_next->type == "Pooling")
+        //         {
+        //             // ToDo
+        //         }
+        //         else
+        //         {
+        //             // fprintf(stderr, "%s\n", layer->name.c_str());
+        //         }
+        //     }
+        // }
+
         if (layer->type == "Convolution" || layer->type == "ConvolutionDepthWise")
         {
             if (layer->type == "Convolution" && (((Convolution *)layer)->weight_data.elemsize != 1u))
@@ -771,75 +894,36 @@ int Net::fuse_network()
                         ((ConvolutionDepthWise *)layer)->top_blob_int8_scale = ((ConvolutionDepthWise *)layer_next)->bottom_blob_int8_scales[0];
                     }
                 }
-                else if (layer_next->type == "ReLU")
+                else if (layer_next->type == "Split")
                 {
-                    int layer_next_2_index = blobs[layer_next->tops[0]].consumers[0];
-                    Layer *layer_next_2 = layers[layer_next_2_index];
-
-                    if (layer_next_2->type == "Convolution" || layer_next_2->type == "ConvolutionDepthWise")
+                    bool all_conv = true;
+                    for (size_t i = 0; i < layer_next->tops.size(); i++)
                     {
-                        if (layer_next_2->type == "Convolution" && ((Convolution *)layer_next_2)->weight_data.elemsize != 1u)
-                            continue;
-                        if (layer_next_2->type == "ConvolutionDepthWise" && ((ConvolutionDepthWise *)layer_next_2)->weight_data.elemsize != 1u)
-                            continue;
-
-                        fprintf(stderr, "%s, %s, %s\n", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str());
-                        if (layer->type == "Convolution" && layer_next_2->type == "Convolution")
+                        int layer_next_2_index = blobs[layer_next_2->tops[i]].consumers[0];
+                        if (layers[layer_next_2_index]->type != "Convolution" && layers[layer_next_2_index]->type != "ConvolutionDepthWise" && layers[layer_next_3_index]->type != "PriorBox")
                         {
-                            ((Convolution *)layer)->use_int8_requantize = true;
-                            ((Convolution *)layer)->top_blob_int8_scale = ((Convolution *)layer_next_2)->bottom_blob_int8_scale;
-                        }
-                        else if (layer->type == "ConvolutionDepthWise" && layer_next_2->type == "Convolution")
-                        {
-                            ((ConvolutionDepthWise *)layer)->use_int8_requantize = true;
-                            ((ConvolutionDepthWise *)layer)->top_blob_int8_scale = ((Convolution *)layer_next_2)->bottom_blob_int8_scale;
-                        }
-                        else if (layer->type == "Convolution" && layer_next_2->type == "ConvolutionDepthWise")
-                        {
-                            ((Convolution *)layer)->use_int8_requantize = true;
-                            ((Convolution *)layer)->top_blob_int8_scale = ((ConvolutionDepthWise *)layer_next_2)->bottom_blob_int8_scales[0];
-                        }
-                        else
-                        {
-                            ((ConvolutionDepthWise *)layer)->use_int8_requantize = true;
-                            ((ConvolutionDepthWise *)layer)->top_blob_int8_scale = ((ConvolutionDepthWise *)layer_next_2)->bottom_blob_int8_scales[0];
+                            // fprintf(stderr, "%s, %s, %s, %s\n", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str(), layers[layer_next_3_index]->name.c_str());
+                            all_conv = false;
                         }
                     }
-                    else if (layer_next_2->type == "Split")
+
+                    if (all_conv == true && layer_next_2->tops.size() >= size_t(2))
                     {
-                        bool all_conv = true;
+                        // fprintf(stderr, "%s, %s, %s, ", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str());
                         for (size_t i = 0; i < layer_next_2->tops.size(); i++)
                         {
-                            int layer_next_3_index = blobs[layer_next_2->tops[i]].consumers[0];
-                            if (layers[layer_next_3_index]->type != "Convolution" && layers[layer_next_3_index]->type != "ConvolutionDepthWise" && layers[layer_next_3_index]->type != "PriorBox")
+                            int layer_next_2_index = blobs[layer_next->tops[i]].consumers[0];
+                            Layer *layer_next_2 = layers[layer_next_2_index];
+
+                            // fprintf(stderr, "%s, ", layer_next_2->name.c_str());
+                            if (layer_next_2->type == "Convolution")
                             {
-                                // fprintf(stderr, "%s, %s, %s, %s\n", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str(), layers[layer_next_3_index]->name.c_str());
-                                all_conv = false;
+                                ((Convolution *)layer)->top_blob_int8_scale = ((Convolution *)layer_next_2)->bottom_blob_int8_scale;
                             }
                         }
 
-                        if (all_conv == true && layer_next_2->tops.size() >= size_t(2))
-                        {
-                            // fprintf(stderr, "%s, %s, %s, ", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str());
-                            for (size_t i = 0; i < layer_next_2->tops.size(); i++)
-                            {
-                                int layer_next_3_index = blobs[layer_next_2->tops[i]].consumers[0];
-                                Layer *layer_next_3 = layers[layer_next_3_index];
-
-                                // fprintf(stderr, "%s, ", layer_next_3->name.c_str());
-                                if (layer_next_3->type == "Convolution")
-                                {
-                                    ((Convolution *)layer)->top_blob_int8_scale = ((Convolution *)layer_next_3)->bottom_blob_int8_scale;
-                                }
-                            }
-
-                            ((Convolution *)layer)->use_int8_requantize = true;
-                            // fprintf(stderr, "\n");
-                        }
-                    }
-                    else
-                    {
-                        // fprintf(stderr, "%s, %s\n", layer->name.c_str(), layer_next->name.c_str());
+                        ((Convolution *)layer)->use_int8_requantize = true;
+                        // fprintf(stderr, "\n");
                     }
                 }
                 else if (layer_next->type == "Pooling")
