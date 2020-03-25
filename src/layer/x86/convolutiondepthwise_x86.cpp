@@ -54,13 +54,22 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option &opt)
         ncnn::ParamDict pd;
         if (use_int8_requantize)
         {
-            pd.set(0, activation_params[0] * top_blob_int8_scale);// min
-            pd.set(1, activation_params[1] * top_blob_int8_scale);// max
+            pd.set(0, activation_params[0] * top_blob_int8_scale); // min
+            pd.set(1, activation_params[1] * top_blob_int8_scale); // max
         }
         else
         {
-            pd.set(0, activation_params[0]);// min
-            pd.set(1, activation_params[1]);// max
+            if (int8_scale_term)
+            {
+                pd.set(0, activation_params[0] * int(pow(2, position_scale_in))); // min
+                pd.set(1, activation_params[1] * int(pow(2, position_scale_in))); // max
+                pd.set(7, 1);
+            }
+            else
+            {
+                pd.set(0, activation_params[0]); // min
+                pd.set(1, activation_params[1]); // max
+            }
         }
 
         activation->load_param(pd);
@@ -327,11 +336,13 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
             Option opt_g = opt;
             opt_g.num_threads = 1;
             opt_g.blob_allocator = bottom_blob_unbordered.allocator;
+            opt_g.use_int_internal = true;
 
             const Mat bottom_blob_g = bottom_blob.channel_range(channels_g * g, channels_g);
             Mat bottom_blob_int8_g = bottom_blob_unbordered.channel_range(channels_g * g, channels_g);
 
-            quantize_float32_to_int8(bottom_blob_g, bottom_blob_int8_g, bottom_blob_int8_scales[g], opt_g);
+            //quantize_float32_to_int8(bottom_blob_g, bottom_blob_int8_g, bottom_blob_int8_scales[g], opt_g);
+            quantize_int_to_int8(bottom_blob_g, bottom_blob_int8_g, bottom_blob_int8_scales[g], position_bottom_scale, position_scale_in, opt_g);
         }
     }
 
@@ -425,12 +436,16 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
         }
         else
         {
-            std::vector<float> dequantize_scales;
+            std::vector<int> dequantize_scales;
+            const int *ptr = bottom_blob_int8_scales.channel(0);
+            const int *ptr_w = weight_data_int8_scales.channel(0);
             for (int g = 0; g < group; g++)
             {
-                float top_rescale = 1.f / (bottom_blob_int8_scales[g] * weight_data_int8_scales[g]);
 
-                dequantize_scales.push_back(top_rescale);
+                float top_rescale = 1.f / ptr[g];
+
+                int scale_in_int = int(top_rescale * pow(2, position_scale_in + position_bottom_scale + 3) / ptr_w[g]);
+                dequantize_scales.push_back(scale_in_int);
             }
 
             if (kernel_w == 3 && kernel_h == 3 && stride_w == 1 && stride_h == 1 && dilation_w == 1 && dilation_h == 1)

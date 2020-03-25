@@ -17,21 +17,22 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class InnerProduct : public Layer
 {
 public:
     InnerProduct();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int load_model(const ModelBin& mb);
+    virtual int load_model(const ModelBin &mb);
 
-    virtual int create_pipeline(const Option& opt);
+    virtual int create_pipeline(const Option &opt);
 
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
-    virtual int forward_int8(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+    virtual int forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
     // param
@@ -51,7 +52,9 @@ public:
     Mat bias_data;
 
     Mat weight_data_int8_scales;
-    float bottom_blob_int8_scale;
+    int bottom_blob_int8_scale;
+    int position_scale_in = 18;
+    int position_bottom_scale = 5;
 };
 
 } // namespace ncnn

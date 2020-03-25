@@ -19,12 +19,15 @@
 static inline signed char float2int8(float v)
 {
     int int32 = static_cast<int>(round(v));
-    if (int32 > 127) return 127;
-    if (int32 < -127) return -127;
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
     return (signed char)int32;
 }
 
-namespace ncnn {
+namespace ncnn
+{
 
 DEFINE_LAYER_CREATOR(Clip)
 
@@ -34,29 +37,30 @@ Clip::Clip()
     support_inplace = true;
 }
 
-int Clip::load_param(const ParamDict& pd)
+int Clip::load_param(const ParamDict &pd)
 {
     min = pd.get(0, -FLT_MAX);
     max = pd.get(1, FLT_MAX);
+    use_int8_inference = pd.get(7, 0);
 
     return 0;
 }
 
-int Clip::forward_inplace_int8(Mat& bottom_top_blob, const Option& opt) const
+int Clip::forward_inplace_int8(Mat &bottom_top_blob, const Option &opt) const
 {
     int w = bottom_top_blob.w;
     int h = bottom_top_blob.h;
     int channels = bottom_top_blob.c;
     int size = w * h;
-    signed char min_int8 = float2int8(min);
-    signed char max_int8 = float2int8(max);
+    int min_int8 = static_cast<int>(round(min));
+    int max_int8 = static_cast<int>(round(max));
 
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int q=0; q<channels; q++)
+#pragma omp parallel for num_threads(opt.num_threads)
+    for (int q = 0; q < channels; q++)
     {
-        signed char* ptr = bottom_top_blob.channel(q);
+        signed char *ptr = bottom_top_blob.channel(q);
 
-        for (int i=0; i<size; i++)
+        for (int i = 0; i < size; i++)
         {
             if (ptr[i] < min_int8)
                 ptr[i] = min_int8;
@@ -68,10 +72,38 @@ int Clip::forward_inplace_int8(Mat& bottom_top_blob, const Option& opt) const
     return 0;
 }
 
+// int Clip::forward_inplace(Mat& bottom_top_blob, const Option& opt) const
+// {
+//     if (bottom_top_blob.elemsize == 1u)
+//     {
+//         return Clip::forward_inplace_int8(bottom_top_blob, opt);
+//     }
 
-int Clip::forward_inplace(Mat& bottom_top_blob, const Option& opt) const
+//     int w = bottom_top_blob.w;
+//     int h = bottom_top_blob.h;
+//     int channels = bottom_top_blob.c;
+//     int size = w * h;
+
+//     #pragma omp parallel for num_threads(opt.num_threads)
+//     for (int q=0; q<channels; q++)
+//     {
+//         float* ptr = bottom_top_blob.channel(q);
+
+//         for (int i=0; i<size; i++)
+//         {
+//             if (ptr[i] < min)
+//                 ptr[i] = min;
+//             if (ptr[i] > max)
+//                 ptr[i] = max;
+//         }
+//     }
+
+//     return 0;
+// }
+
+int Clip::forward_inplace(Mat &bottom_top_blob, const Option &opt) const
 {
-    if (bottom_top_blob.elemsize == 1u)
+    if (use_int8_inference)
     {
         return Clip::forward_inplace_int8(bottom_top_blob, opt);
     }
@@ -81,17 +113,17 @@ int Clip::forward_inplace(Mat& bottom_top_blob, const Option& opt) const
     int channels = bottom_top_blob.c;
     int size = w * h;
 
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int q=0; q<channels; q++)
+#pragma omp parallel for num_threads(opt.num_threads)
+    for (int q = 0; q < channels; q++)
     {
-        float* ptr = bottom_top_blob.channel(q);
+        int *ptr = bottom_top_blob.channel(q);
 
-        for (int i=0; i<size; i++)
+        for (int i = 0; i < size; i++)
         {
             if (ptr[i] < min)
-                ptr[i] = min;
+                ptr[i] = int(min);
             if (ptr[i] > max)
-                ptr[i] = max;
+                ptr[i] = int(max);
         }
     }
 

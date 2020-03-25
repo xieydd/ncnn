@@ -69,11 +69,22 @@ int Convolution_x86::create_pipeline(const Option &opt)
         ncnn::ParamDict pd;
         if (use_int8_requantize)
         {
-            pd.set(0, activation_params[0] * top_blob_int8_scale);// min
-            pd.set(1, activation_params[1] * top_blob_int8_scale);// max
-        }else{
-            pd.set(0, activation_params[0]);// min
-            pd.set(1, activation_params[1]);// max
+            pd.set(0, activation_params[0] * top_blob_int8_scale); // min
+            pd.set(1, activation_params[1] * top_blob_int8_scale); // max
+        }
+        else
+        {
+            if (int8_scale_term)
+            {
+                pd.set(0, activation_params[0] * int(pow(2, position_scale_in))); // min
+                pd.set(1, activation_params[1] * int(pow(2, position_scale_in))); // max
+                pd.set(7, 1);
+            }
+            else
+            {
+                pd.set(0, activation_params[0]); // min
+                pd.set(1, activation_params[1]); // max
+            }
         }
 
         activation->load_param(pd);
@@ -342,8 +353,34 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
     {
         Option opt_g = opt;
         opt_g.blob_allocator = opt.workspace_allocator;
+        opt_g.use_int_internal = true;
 
-        quantize_float32_to_int8(bottom_blob, bottom_blob_unbordered, bottom_blob_int8_scale, opt_g);
+        //quantize_float32_to_int8(bottom_blob, bottom_blob_unbordered, bottom_blob_int8_scale, opt_g);
+        const char *get_name = "260";
+        if (strcmp(get_name, name.c_str()))
+        {
+            Mat a = bottom_blob;
+            for (int i = 0; i < bottom_blob.c; i++)
+            {
+                const float *ptr = bottom_blob.channel(i);
+                int *ptr_a = a.channel(i);
+                for (int j = 0; j < bottom_blob.h; j++)
+                {
+                    for (int k = 0; k < bottom_blob.w; k++)
+                    {
+                        ptr_a[k] = static_cast<int>(round(ptr[k] * pow(2, position_scale_in)));
+                    }
+                    ptr_a += bottom_blob.w;
+                    ptr += bottom_blob.w;
+                }
+            }
+
+            quantize_int_to_int8(a, bottom_blob_unbordered, bottom_blob_int8_scale, position_bottom_scale, position_scale_in, opt_g);
+        }
+        else
+        {
+            quantize_int_to_int8(bottom_blob, bottom_blob_unbordered, bottom_blob_int8_scale, position_bottom_scale, position_scale_in, opt_g);
+        }
     }
 
     Mat bottom_blob_bordered = bottom_blob_unbordered;
@@ -478,16 +515,19 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
         }
         else
         {
-            std::vector<float> dequantize_scales;
+            std::vector<int> dequantize_scales;
+            const int *ptr = weight_data_int8_scales.channel(0);
             for (int p = 0; p < num_output; p++)
             {
                 float scale_in;
-                if (weight_data_int8_scales[p] == 0)
+                if (ptr[p] == 0)
                     scale_in = 0;
                 else
-                    scale_in = 1.f / (bottom_blob_int8_scale * weight_data_int8_scales[p]);
+                    scale_in = 1.f / (bottom_blob_int8_scale);
 
-                dequantize_scales.push_back(scale_in);
+                ;
+                int scale_in_int = int(scale_in * pow(2, position_scale_in + position_bottom_scale + 3) / ptr[p]);
+                dequantize_scales.push_back(scale_in_int);
             }
 
             conv_im2col_sgemm_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, kernel_w, kernel_h, stride_w, stride_h, bias_data, dequantize_scales, opt);

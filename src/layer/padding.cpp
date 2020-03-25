@@ -14,7 +14,8 @@
 
 #include "padding.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 DEFINE_LAYER_CREATOR(Padding)
 
@@ -24,7 +25,7 @@ Padding::Padding()
     support_inplace = false;
 }
 
-int Padding::load_param(const ParamDict& pd)
+int Padding::load_param(const ParamDict &pd)
 {
     top = pd.get(0, 0);
     bottom = pd.get(1, 0);
@@ -33,6 +34,7 @@ int Padding::load_param(const ParamDict& pd)
     type = pd.get(4, 0);
     value = pd.get(5, 0.f);
     per_channel_pad_data_size = pd.get(6, 0);
+    use_int8_inference = pd.get(7, 0);
 
     if (top == -233 && bottom == -233 && left == -233 && right == -233)
     {
@@ -42,7 +44,7 @@ int Padding::load_param(const ParamDict& pd)
     return 0;
 }
 
-int Padding::load_model(const ModelBin& mb)
+int Padding::load_model(const ModelBin &mb)
 {
     if (per_channel_pad_data_size)
     {
@@ -52,14 +54,14 @@ int Padding::load_model(const ModelBin& mb)
     return 0;
 }
 
-template<typename T>
-static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, int type, T v)
+template <typename T>
+static void copy_make_border_image(const Mat &src, Mat &dst, int top, int left, int type, T v)
 {
     int w = dst.w;
     int h = dst.h;
 
-    const T* ptr = src;
-    T* outptr = dst;
+    const T *ptr = src;
+    T *outptr = dst;
 
     if (type == 0)
     {
@@ -123,7 +125,7 @@ static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, 
             {
                 outptr[x] = ptr[0];
             }
-            if(src.w < 12)
+            if (src.w < 12)
             {
                 for (; x < (left + src.w); x++)
                 {
@@ -149,7 +151,7 @@ static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, 
             {
                 outptr[x] = ptr[0];
             }
-            if(src.w < 12)
+            if (src.w < 12)
             {
                 for (; x < (left + src.w); x++)
                 {
@@ -177,7 +179,7 @@ static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, 
             {
                 outptr[x] = ptr[0];
             }
-            if(src.w < 12)
+            if (src.w < 12)
             {
                 for (; x < (left + src.w); x++)
                 {
@@ -208,7 +210,7 @@ static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, 
             {
                 outptr[x] = ptr[left - x];
             }
-            if(src.w < 12)
+            if (src.w < 12)
             {
                 for (; x < (left + src.w); x++)
                 {
@@ -235,7 +237,7 @@ static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, 
             {
                 outptr[x] = ptr[left - x];
             }
-            if(src.w < 12)
+            if (src.w < 12)
             {
                 for (; x < (left + src.w); x++)
                 {
@@ -263,7 +265,7 @@ static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, 
             {
                 outptr[x] = ptr[left - x];
             }
-            if(src.w < 12)
+            if (src.w < 12)
             {
                 for (; x < (left + src.w); x++)
                 {
@@ -283,11 +285,14 @@ static void copy_make_border_image(const Mat& src, Mat& dst, int top, int left, 
             ptr -= src.w;
         }
     }
-
 }
 
-int Padding::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int Padding::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
+    if (use_int8_inference)
+    {
+        return forward_int8(bottom_blob, top_blob, opt);
+    }
     if (top == 0 && bottom == 0 && left == 0 && right == 0)
     {
         top_blob = bottom_blob;
@@ -338,8 +343,8 @@ int Padding::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) c
         if (top_blob.empty())
             return -100;
 
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int q=0; q<channels; q++)
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int q = 0; q < channels; q++)
         {
             const Mat m = bottom_blob.channel(q);
             Mat borderm = top_blob.channel(q);
@@ -358,19 +363,81 @@ int Padding::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) c
     return 0;
 }
 
-int Padding::forward(const std::vector<Mat>& bottom_blobs, std::vector<Mat>& top_blobs, const Option& opt) const
+int Padding::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
-    const Mat& bottom_blob = bottom_blobs[0];
-    const Mat& reference_blob = bottom_blobs[1];
+    if (top == 0 && bottom == 0 && left == 0 && right == 0)
+    {
+        top_blob = bottom_blob;
+        return 0;
+    }
 
-    Mat& top_blob = top_blobs[0];
+    int w = bottom_blob.w;
+    int h = bottom_blob.h;
+    int channels = bottom_blob.c;
+    int dims = bottom_blob.dims;
+    size_t elemsize = bottom_blob.elemsize;
+
+    int outw = w + left + right;
+
+    if (dims == 1)
+    {
+        top_blob.create(outw, elemsize, opt.blob_allocator);
+        if (top_blob.empty())
+            return -100;
+
+        copy_make_border_image<int>(bottom_blob, top_blob, 0, left, type, value);
+        return 0;
+    }
+
+    int outh = h + top + bottom;
+
+    if (dims == 2)
+    {
+        top_blob.create(outw, outh, elemsize, opt.blob_allocator);
+        if (top_blob.empty())
+            return -100;
+
+        copy_make_border_image<int>(bottom_blob, top_blob, top, left, type, value);
+
+        return 0;
+    }
+
+    if (dims == 3)
+    {
+        top_blob.create(outw, outh, channels, elemsize, opt.blob_allocator);
+        if (top_blob.empty())
+            return -100;
+
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int q = 0; q < channels; q++)
+        {
+            const Mat m = bottom_blob.channel(q);
+            Mat borderm = top_blob.channel(q);
+
+            int pad_value = per_channel_pad_data_size ? per_channel_pad_data[q] : value;
+
+            copy_make_border_image<int>(m, borderm, top, left, type, pad_value);
+        }
+
+        return 0;
+    }
+
+    return 0;
+}
+
+int Padding::forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const
+{
+    const Mat &bottom_blob = bottom_blobs[0];
+    const Mat &reference_blob = bottom_blobs[1];
+
+    Mat &top_blob = top_blobs[0];
 
     int _top;
     int _bottom;
     int _left;
     int _right;
     {
-        const int* param_data = reference_blob;
+        const int *param_data = reference_blob;
 
         _top = param_data[0];
         _bottom = param_data[1];
@@ -428,8 +495,8 @@ int Padding::forward(const std::vector<Mat>& bottom_blobs, std::vector<Mat>& top
         if (top_blob.empty())
             return -100;
 
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int q=0; q<channels; q++)
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int q = 0; q < channels; q++)
         {
             const Mat m = bottom_blob.channel(q);
             Mat borderm = top_blob.channel(q);

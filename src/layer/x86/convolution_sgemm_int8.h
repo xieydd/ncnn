@@ -458,7 +458,8 @@ static void conv_im2col_sgemm_int8_sse(const Mat &bottom_blob, Mat &top_blob, co
 }
 
 static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel,
-                                               const int kernel_w, const int kernel_h, const int stride_w, const int stride_h, const Mat &_bias, std::vector<float> scale_dequant, const Option &opt)
+                                               //const int kernel_w, const int kernel_h, const int stride_w, const int stride_h, const Mat &_bias, std::vector<float> scale_dequant, const Option &opt)
+                                               const int kernel_w, const int kernel_h, const int stride_w, const int stride_h, const Mat &_bias, std::vector<int> scale_dequant, const Option &opt)
 {
     int w = bottom_blob.w;
     int inch = bottom_blob.c;
@@ -693,15 +694,25 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
             const int32_t bias2 = bias ? bias[i + 2] : 0;
             const int32_t bias3 = bias ? bias[i + 3] : 0;
 
-            const float scale_dequant0 = scale_dequant[i];
-            const float scale_dequant1 = scale_dequant[i + 1];
-            const float scale_dequant2 = scale_dequant[i + 2];
-            const float scale_dequant3 = scale_dequant[i + 3];
+            // const float scale_dequant0 = scale_dequant[i];
+            // const float scale_dequant1 = scale_dequant[i + 1];
+            // const float scale_dequant2 = scale_dequant[i + 2];
+            // const float scale_dequant3 = scale_dequant[i + 3];
 
-            float *output0 = top_blob.channel(i);
-            float *output1 = top_blob.channel(i + 1);
-            float *output2 = top_blob.channel(i + 2);
-            float *output3 = top_blob.channel(i + 3);
+            const int scale_dequant0 = scale_dequant[i];
+            const int scale_dequant1 = scale_dequant[i + 1];
+            const int scale_dequant2 = scale_dequant[i + 2];
+            const int scale_dequant3 = scale_dequant[i + 3];
+
+            // float *output0 = top_blob.channel(i);
+            // float *output1 = top_blob.channel(i + 1);
+            // float *output2 = top_blob.channel(i + 2);
+            // float *output3 = top_blob.channel(i + 3);
+
+            int *output0 = top_blob.channel(i);
+            int *output1 = top_blob.channel(i + 1);
+            int *output2 = top_blob.channel(i + 2);
+            int *output3 = top_blob.channel(i + 3);
 
             int j = 0;
             for (; j + 3 < N; j = j + 4)
@@ -832,7 +843,8 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
             float *output = top_blob.channel(i);
 
             const int32_t bias0 = bias ? bias[i] : 0;
-            const float scale_dequant0 = scale_dequant[i];
+            // const float scale_dequant0 = scale_dequant[i];
+            const int scale_dequant0 = scale_dequant[i];
 
             int j = 0;
             for (; j + 3 < N; j = j + 4)

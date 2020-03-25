@@ -17,21 +17,25 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Input : public Layer
 {
 public:
     Input();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int forward_inplace(Mat& bottom_top_blob, const Option& opt) const;
+    virtual int forward_inplace(Mat &bottom_top_blob, const Option &opt) const;
+
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
     int w;
     int h;
     int c;
+    int position_scale_in = 19;
 };
 
 } // namespace ncnn

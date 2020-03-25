@@ -14,7 +14,8 @@
 
 #include "flatten.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 DEFINE_LAYER_CREATOR(Flatten)
 
@@ -24,7 +25,45 @@ Flatten::Flatten()
     support_inplace = false;
 }
 
-int Flatten::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int Flatten::load_param(const ParamDict &pd)
+{
+    use_int8_inference = pd.get(7, 0);
+
+    return 0;
+}
+
+int Flatten::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
+{
+    if (use_int8_inference)
+    {
+        return forward_int8(bottom_blob, top_blob, opt);
+    }
+    int w = bottom_blob.w;
+    int h = bottom_blob.h;
+    int channels = bottom_blob.c;
+    size_t elemsize = bottom_blob.elemsize;
+    int size = w * h;
+
+    top_blob.create(size * channels, elemsize, opt.blob_allocator);
+    if (top_blob.empty())
+        return -100;
+
+#pragma omp parallel for num_threads(opt.num_threads)
+    for (int q = 0; q < channels; q++)
+    {
+        const float *ptr = bottom_blob.channel(q);
+        float *outptr = (float *)top_blob + size * q;
+
+        for (int i = 0; i < size; i++)
+        {
+            outptr[i] = ptr[i];
+        }
+    }
+
+    return 0;
+}
+
+int Flatten::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     int w = bottom_blob.w;
     int h = bottom_blob.h;
@@ -36,13 +75,13 @@ int Flatten::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) c
     if (top_blob.empty())
         return -100;
 
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int q=0; q<channels; q++)
+#pragma omp parallel for num_threads(opt.num_threads)
+    for (int q = 0; q < channels; q++)
     {
-        const float* ptr = bottom_blob.channel(q);
-        float* outptr = (float*)top_blob + size * q;
+        const int *ptr = bottom_blob.channel(q);
+        int *outptr = (int *)top_blob + size * q;
 
-        for (int i=0; i<size; i++)
+        for (int i = 0; i < size; i++)
         {
             outptr[i] = ptr[i];
         }
@@ -50,5 +89,4 @@ int Flatten::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) c
 
     return 0;
 }
-
 } // namespace ncnn

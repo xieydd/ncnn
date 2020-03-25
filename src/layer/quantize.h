@@ -17,19 +17,23 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Quantize : public Layer
 {
 public:
     Quantize();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
-    float scale;
+    // float scale;
+    int scale;
+    int position_bottom_scale;
+    int position_scale_in;
 };
 
 } // namespace ncnn

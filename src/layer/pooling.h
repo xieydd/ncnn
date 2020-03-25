@@ -17,18 +17,24 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Pooling : public Layer
 {
 public:
     Pooling();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+    virtual int forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
-    enum PoolMethod { PoolMethod_MAX = 0, PoolMethod_AVE = 1 };
+    enum PoolMethod
+    {
+        PoolMethod_MAX = 0,
+        PoolMethod_AVE = 1
+    };
 
 public:
     // param
@@ -42,8 +48,9 @@ public:
     int pad_top;
     int pad_bottom;
     int global_pooling;
-    int pad_mode;// 0=full 1=valid 2=SAME_UPPER 3=SAME_LOWER
+    int pad_mode; // 0=full 1=valid 2=SAME_UPPER 3=SAME_LOWER
     int avgpool_count_include_pad;
+    int use_int8_inference;
 };
 
 } // namespace ncnn

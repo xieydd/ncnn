@@ -17,22 +17,24 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Clip : public Layer
 {
 public:
     Clip();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int forward_inplace(Mat& bottom_top_blob, const Option& opt) const;
-    
-    virtual int forward_inplace_int8(Mat& bottom_top_blob, const Option& opt) const;
+    virtual int forward_inplace(Mat &bottom_top_blob, const Option &opt) const;
+
+    virtual int forward_inplace_int8(Mat &bottom_top_blob, const Option &opt) const;
 
 public:
     float min;
     float max;
+    int use_int8_inference;
 };
 
 } // namespace ncnn

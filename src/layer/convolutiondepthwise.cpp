@@ -16,7 +16,8 @@
 #include <algorithm>
 #include "layer_type.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 DEFINE_LAYER_CREATOR(ConvolutionDepthWise)
 
@@ -28,7 +29,7 @@ ConvolutionDepthWise::ConvolutionDepthWise()
     use_int8_requantize = false;
 }
 
-int ConvolutionDepthWise::load_param(const ParamDict& pd)
+int ConvolutionDepthWise::load_param(const ParamDict &pd)
 {
     num_output = pd.get(0, 0);
     kernel_w = pd.get(1, 0);
@@ -58,7 +59,7 @@ int ConvolutionDepthWise::load_param(const ParamDict& pd)
     return 0;
 }
 
-int ConvolutionDepthWise::load_model(const ModelBin& mb)
+int ConvolutionDepthWise::load_model(const ModelBin &mb)
 {
     weight_data = mb.load(weight_data_size, 0);
     if (weight_data.empty())
@@ -76,7 +77,8 @@ int ConvolutionDepthWise::load_model(const ModelBin& mb)
         weight_data_int8_scales = mb.load(group, 1);
         bottom_blob_int8_scales = mb.load(1, 1);
 
-        float bottom_blob_int8_scale = bottom_blob_int8_scales[0];
+        const int *ptr = bottom_blob_int8_scales.channel(0);
+        int bottom_blob_int8_scale = ptr[0];
         bottom_blob_int8_scales = Mat(group);
         bottom_blob_int8_scales.fill(bottom_blob_int8_scale);
     }
@@ -86,11 +88,13 @@ int ConvolutionDepthWise::load_model(const ModelBin& mb)
         bottom_blob_int8_scales = mb.load(1, 1);
 
         // extend group if only one provided
-        float weight_data_int8_scale = weight_data_int8_scales[0];
+        const int *ptr_w = weight_data_int8_scales.channel(0);
+        int weight_data_int8_scale = ptr_w[0];
         weight_data_int8_scales = Mat(group);
         weight_data_int8_scales.fill(weight_data_int8_scale);
 
-        float bottom_blob_int8_scale = bottom_blob_int8_scales[0];
+        const int *ptr = bottom_blob_int8_scales.channel(0);
+        int bottom_blob_int8_scale = ptr[0];
         bottom_blob_int8_scales = Mat(group);
         bottom_blob_int8_scales.fill(bottom_blob_int8_scale);
     }
@@ -98,7 +102,7 @@ int ConvolutionDepthWise::load_model(const ModelBin& mb)
     return 0;
 }
 
-int ConvolutionDepthWise::create_pipeline(const Option& opt)
+int ConvolutionDepthWise::create_pipeline(const Option &opt)
 {
     // runtime quantize the weight data
     if (opt.use_int8_inference && weight_data.elemsize == (size_t)4u && int8_scale_term)
@@ -109,7 +113,7 @@ int ConvolutionDepthWise::create_pipeline(const Option& opt)
 
         const int weight_data_size_g = weight_data_size / group;
 
-        for (int g=0; g<group; g++)
+        for (int g = 0; g < group; g++)
         {
             Option opt_q = opt;
             opt_q.blob_allocator = int8_weight_data.allocator;
@@ -125,7 +129,7 @@ int ConvolutionDepthWise::create_pipeline(const Option& opt)
     return 0;
 }
 
-int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int ConvolutionDepthWise::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     // convolv with NxN kernel
     // value = value + bias
@@ -146,7 +150,7 @@ int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const O
         return -100;
     }
 
-//     fprintf(stderr, "ConvolutionDepthWise input %d x %d  pad = %d %d  ksize=%d %d  stride=%d %d\n", w, h, pad_w, pad_h, kernel_w, kernel_h, stride_w, stride_h);
+    //     fprintf(stderr, "ConvolutionDepthWise input %d x %d  pad = %d %d  ksize=%d %d  stride=%d %d\n", w, h, pad_w, pad_h, kernel_w, kernel_h, stride_w, stride_h);
 
     const int kernel_extent_w = dilation_w * (kernel_w - 1) + 1;
     const int kernel_extent_h = dilation_h * (kernel_h - 1) + 1;
@@ -195,7 +199,7 @@ int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const O
 
     // kernel offsets
     std::vector<int> _space_ofs(maxk);
-    int* space_ofs = &_space_ofs[0];
+    int *space_ofs = &_space_ofs[0];
     {
         int p1 = 0;
         int p2 = 0;
@@ -220,11 +224,11 @@ int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const O
     // depth-wise
     if (channels == group && group == num_output)
     {
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int g=0; g<group; g++)
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int g = 0; g < group; g++)
         {
-            float* outptr = top_blob.channel(g);
-            const float* kptr = (const float*)weight_data + maxk * g;
+            float *outptr = top_blob.channel(g);
+            const float *kptr = (const float *)weight_data + maxk * g;
             const Mat m = bottom_blob_bordered.channel(g);
 
             for (int i = 0; i < outh; i++)
@@ -236,11 +240,11 @@ int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const O
                     if (bias_term)
                         sum = bias_data[g];
 
-                    const float* sptr = m.row(i*stride_h) + j*stride_w;
+                    const float *sptr = m.row(i * stride_h) + j * stride_w;
 
                     for (int k = 0; k < maxk; k++)
                     {
-                        float val = sptr[ space_ofs[k] ];
+                        float val = sptr[space_ofs[k]];
                         float w = kptr[k];
                         sum += val * w;
                     }
@@ -282,16 +286,16 @@ int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const O
         const int num_output_g = num_output / group;
 
 #ifdef _WIN32
-        #pragma omp parallel for num_threads(opt.num_threads)
+#pragma omp parallel for num_threads(opt.num_threads)
 #else // _WIN32
-        #pragma omp parallel for collapse(2) num_threads(opt.num_threads)
+#pragma omp parallel for collapse(2) num_threads(opt.num_threads)
 #endif // _WIN32
-        for (int g=0; g<group; g++)
+        for (int g = 0; g < group; g++)
         {
-            for (int p=0; p<num_output_g; p++)
+            for (int p = 0; p < num_output_g; p++)
             {
-                float* outptr = top_blob.channel(g * num_output_g + p);
-                const float* weight_data_ptr = (const float*)weight_data + maxk * channels_g * num_output_g * g;
+                float *outptr = top_blob.channel(g * num_output_g + p);
+                const float *weight_data_ptr = (const float *)weight_data + maxk * channels_g * num_output_g * g;
 
                 for (int i = 0; i < outh; i++)
                 {
@@ -302,17 +306,17 @@ int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const O
                         if (bias_term)
                             sum = bias_data[num_output_g * g + p];
 
-                        const float* kptr = weight_data_ptr + maxk * channels_g * p;
+                        const float *kptr = weight_data_ptr + maxk * channels_g * p;
 
                         // channels_g
-                        for (int q=0; q<channels_g; q++)
+                        for (int q = 0; q < channels_g; q++)
                         {
                             const Mat m = bottom_blob_bordered.channel(channels_g * g + q);
-                            const float* sptr = m.row(i*stride_h) + j*stride_w;
+                            const float *sptr = m.row(i * stride_h) + j * stride_w;
 
                             for (int k = 0; k < maxk; k++)
                             {
-                                float val = sptr[ space_ofs[k] ];
+                                float val = sptr[space_ofs[k]];
                                 float w = kptr[k];
                                 sum += val * w;
                             }
@@ -358,12 +362,14 @@ int ConvolutionDepthWise::forward(const Mat& bottom_blob, Mat& top_blob, const O
 static inline signed char float2int8(float v)
 {
     int int32 = static_cast<int>(round(v));
-    if (int32 > 127) return 127;
-    if (int32 < -127) return -127;
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
     return (signed char)int32;
 }
 
-int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int ConvolutionDepthWise::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     // convolv with NxN kernel
     // value = value + bias
@@ -379,7 +385,7 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
         return -100;
     }
 
-//     fprintf(stderr, "ConvolutionDepthWise input %d x %d  pad = %d %d  ksize=%d %d  stride=%d %d\n", w, h, pad_w, pad_h, kernel_w, kernel_h, stride_w, stride_h);
+    //     fprintf(stderr, "ConvolutionDepthWise input %d x %d  pad = %d %d  ksize=%d %d  stride=%d %d\n", w, h, pad_w, pad_h, kernel_w, kernel_h, stride_w, stride_h);
 
     const int kernel_extent_w = dilation_w * (kernel_w - 1) + 1;
     const int kernel_extent_h = dilation_h * (kernel_h - 1) + 1;
@@ -393,9 +399,9 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
 
         const int channels_g = channels / group;
 
-        // quantize, scale and round to nearest
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int g=0; g<group; g++)
+// quantize, scale and round to nearest
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int g = 0; g < group; g++)
         {
             Option opt_g = opt;
             opt_g.num_threads = 1;
@@ -452,7 +458,7 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
 
     // kernel offsets
     std::vector<int> _space_ofs(maxk);
-    int* space_ofs = &_space_ofs[0];
+    int *space_ofs = &_space_ofs[0];
     {
         int p1 = 0;
         int p2 = 0;
@@ -479,11 +485,11 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
     // depth-wise
     if (channels == group && group == num_output)
     {
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int g=0; g<group; g++)
+#pragma omp parallel for num_threads(opt.num_threads)
+        for (int g = 0; g < group; g++)
         {
-            signed char* outptr = top_blob.channel(g);
-            const signed char* kptr = (const signed char*)weight_data + maxk * g;
+            signed char *outptr = top_blob.channel(g);
+            const signed char *kptr = (const signed char *)weight_data + maxk * g;
             const Mat m = bottom_blob_bordered.channel(g);
 
             for (int i = 0; i < outh; i++)
@@ -492,11 +498,11 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
                 {
                     int sum = 0;
 
-                    const signed char* sptr = m.row<signed char>(i*stride_h) + j*stride_w;
+                    const signed char *sptr = m.row<signed char>(i * stride_h) + j * stride_w;
 
                     for (int k = 0; k < maxk; k++)
                     {
-                        signed char val = sptr[ space_ofs[k] ];
+                        signed char val = sptr[space_ofs[k]];
                         signed char w = kptr[k];
                         sum += val * w;
                     }
@@ -515,7 +521,7 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
                         if (bias_term)
                             sumfp32 += bias_data[g];
 
-                        float scale_out = top_blob_int8_scale;//FIXME load param
+                        float scale_out = top_blob_int8_scale; //FIXME load param
 
                         signed char sums8 = float2int8(sumfp32 * scale_out);
 
@@ -546,7 +552,7 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
                             sumfp32 = std::max(sumfp32, 0.f);
                         }
 
-                        ((float*)outptr)[0] = sumfp32;
+                        ((float *)outptr)[0] = sumfp32;
                         outptr += 4;
                     }
                 }
@@ -560,16 +566,16 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
         const int num_output_g = num_output / group;
 
 #ifdef _WIN32
-        #pragma omp parallel for num_threads(opt.num_threads)
+#pragma omp parallel for num_threads(opt.num_threads)
 #else // _WIN32
-        #pragma omp parallel for collapse(2) num_threads(opt.num_threads)
+#pragma omp parallel for collapse(2) num_threads(opt.num_threads)
 #endif // _WIN32
-        for (int g=0; g<group; g++)
+        for (int g = 0; g < group; g++)
         {
-            for (int p=0; p<num_output_g; p++)
+            for (int p = 0; p < num_output_g; p++)
             {
-                signed char* outptr = top_blob.channel(g * num_output_g + p);
-                const signed char* weight_data_ptr = (const signed char*)weight_data + maxk * channels_g * num_output_g * g;
+                signed char *outptr = top_blob.channel(g * num_output_g + p);
+                const signed char *weight_data_ptr = (const signed char *)weight_data + maxk * channels_g * num_output_g * g;
 
                 for (int i = 0; i < outh; i++)
                 {
@@ -577,17 +583,17 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
                     {
                         int sum = 0;
 
-                        const signed char* kptr = weight_data_ptr + maxk * channels_g * p;
+                        const signed char *kptr = weight_data_ptr + maxk * channels_g * p;
 
                         // channels_g
-                        for (int q=0; q<channels_g; q++)
+                        for (int q = 0; q < channels_g; q++)
                         {
                             const Mat m = bottom_blob_bordered.channel(channels_g * g + q);
-                            const signed char* sptr = m.row<signed char>(i*stride_h) + j*stride_w;
+                            const signed char *sptr = m.row<signed char>(i * stride_h) + j * stride_w;
 
                             for (int k = 0; k < maxk; k++)
                             {
-                                signed char val = sptr[ space_ofs[k] ];
+                                signed char val = sptr[space_ofs[k]];
                                 signed char w = kptr[k];
                                 sum += val * w;
                             }
@@ -609,7 +615,7 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
                             if (bias_term)
                                 sumfp32 += bias_data[g * num_output_g + p];
 
-                            float scale_out = top_blob_int8_scale;//FIXME load param
+                            float scale_out = top_blob_int8_scale; //FIXME load param
 
                             signed char sums8 = float2int8(sumfp32 * scale_out);
 
@@ -640,7 +646,7 @@ int ConvolutionDepthWise::forward_int8(const Mat& bottom_blob, Mat& top_blob, co
                                 sumfp32 = std::max(sumfp32, 0.f);
                             }
 
-                            ((float*)outptr)[0] = sumfp32;
+                            ((float *)outptr)[0] = sumfp32;
                             outptr += 4;
                         }
                     }

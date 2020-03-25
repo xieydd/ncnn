@@ -55,7 +55,9 @@ int InnerProduct::load_model(const ModelBin &mb)
     if (int8_scale_term)
     {
         weight_data_int8_scales = mb.load(num_output, 1);
-        bottom_blob_int8_scale = mb.load(1, 1)[0];
+        Mat bottom_blob_int8_scales = mb.load(1, 1);
+        const int *ptr = bottom_blob_int8_scales.channel(0);
+        bottom_blob_int8_scale = ptr[0];
     }
 
     return 0;
@@ -168,8 +170,8 @@ int InnerProduct::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Opti
     {
         Option opt_g = opt;
         opt_g.blob_allocator = opt.workspace_allocator;
-
-        quantize_float32_to_int8(bottom_blob, bottom_blob_tm, bottom_blob_int8_scale, opt_g);
+        opt_g.use_int_internal = true;
+        quantize_int_to_int8(bottom_blob, bottom_blob_tm, bottom_blob_int8_scale, position_bottom_scale, position_scale_in, opt_g);
     }
 
     top_blob.create(num_output, elemsize, opt.blob_allocator);
@@ -198,11 +200,12 @@ int InnerProduct::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Opti
 
         // dequantize and relu
         float scale_in;
-        if (weight_data_int8_scales[p] == 0)
+        const int *ptr_w = weight_data_int8_scales.channel(0);
+        if (ptr_w[p] == 0)
             scale_in = 0;
         else
-            scale_in = 1.f / (bottom_blob_int8_scale * weight_data_int8_scales[p]);
-
+            scale_in = 1.f / bottom_blob_int8_scale;
+        int scale_out = int(scale_in * pow(2, position_bottom_scale + position_scale_in + 3) / ptr_w[p]);
         int32_t sum_int32 = sum;
         if (bias_term)
         {
@@ -215,7 +218,7 @@ int InnerProduct::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Opti
             sum_int32 = std::max(sum_int32, 0);
         }
 
-        outptr[p] = sum_int32 * scale_in;
+        outptr[p] = 1.0f * sum_int32 * scale_out / pow(2, position_scale_in);
     }
 
     return 0;

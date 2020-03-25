@@ -151,7 +151,7 @@ static void convdw3x3s2_int8_sse(const Mat &bottom_blob, Mat &top_blob, const Ma
     }
 }
 
-static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<float> scales_dequant, const Option &opt)
+static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<int> scales_dequant, const Option &opt)
 {
     int w = bottom_blob.w;
     //int h = bottom_blob.h;
@@ -168,9 +168,10 @@ static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
     for (int p = 0; p < outch; p++)
     {
         Mat out = top_blob.channel(p);
-        float *outptr = out;
+        int *outptr = out;
 
-        const float scale_dequant = scales_dequant[p];
+        //const float scale_dequant = scales_dequant[p];
+        const int scale_dequant = scales_dequant[p];
         //const float bias0 = bias ? bias[p] * scale_dequant : 0.f;
         const int32_t bias0 = bias ? bias[p] : 0;
 
@@ -219,7 +220,7 @@ static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
     }
 }
 
-static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<float> scales_dequant, const Option &opt)
+static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<int> scales_dequant, const Option &opt)
 {
     int w = bottom_blob.w;
     //int h = bottom_blob.h;
@@ -238,9 +239,10 @@ static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
     for (int p = 0; p < outch; p++)
     {
         Mat out = top_blob.channel(p);
-        float *outptr = out;
+        int *outptr = out;
 
-        const float scale_dequant = scales_dequant[p];
+        //const float scale_dequant = scales_dequant[p];
+        const int scale_dequant = scales_dequant[p];
         //const float bias0 = bias ? bias[p] * scale_dequant : 0.f;
         const int32_t bias0 = bias ? bias[p] : 0;
 

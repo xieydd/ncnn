@@ -78,7 +78,7 @@
 #include "layer/yolodetectionoutput.h"
 #include "layer/yolov3detectionoutput.h"
 
-static bool read_int8scale_table(const char *filepath, std::map<std::string, std::vector<float>> &blob_int8scale_table, std::map<std::string, std::vector<float>> &weight_int8scale_table)
+static bool read_floatscale_table(const char *filepath, std::map<std::string, std::vector<float>> &blob_int8scale_table, std::map<std::string, std::vector<float>> &weight_int8scale_table)
 {
     blob_int8scale_table.clear();
     weight_int8scale_table.clear();
@@ -146,6 +146,74 @@ static bool read_int8scale_table(const char *filepath, std::map<std::string, std
     return true;
 }
 
+static bool read_intscale_table(const char *filepath, std::map<std::string, std::vector<int>> &blob_intscale_table, std::map<std::string, std::vector<int>> &weight_intscale_table)
+{
+    blob_intscale_table.clear();
+    weight_intscale_table.clear();
+
+    FILE *fp = fopen(filepath, "rb");
+    if (!fp)
+    {
+        fprintf(stderr, "Open %s failed.\n", filepath);
+        return false;
+    }
+
+    std::string key_str;
+    std::vector<int> scales;
+
+    std::vector<char> line(102400);
+    char *pch = NULL;
+    size_t len = 0;
+
+    while (NULL != std::fgets(line.data(), static_cast<int>(line.size()), fp))
+    {
+        int scale = 1;
+        char key[256];
+        line[strcspn(line.data(), "\r\n")] = 0;
+
+        pch = strtok(line.data(), " ");
+
+        if (pch == NULL)
+            break;
+
+        bool is_key = true;
+        while (pch != NULL)
+        {
+            if (is_key)
+            {
+                sscanf(pch, "%255s", key);
+
+                key_str = key;
+                is_key = false;
+            }
+            else
+            {
+                sscanf(pch, "%u", &scale);
+
+                scales.push_back(scale);
+            }
+
+            pch = strtok(NULL, " ");
+        }
+
+        // XYZ_param_N pattern
+        if (strstr(key_str.c_str(), "_param_"))
+        {
+            weight_intscale_table[key_str] = scales;
+        }
+        else
+        {
+            blob_intscale_table[key_str] = scales;
+        }
+        key_str.clear();
+        scales.clear();
+    }
+
+    fclose(fp);
+
+    return true;
+}
+
 class NetQuantize : public ncnn::Net
 {
 public:
@@ -153,6 +221,8 @@ public:
     int storage_type;
     std::map<std::string, std::vector<float>> blob_int8scale_table;
     std::map<std::string, std::vector<float>> weight_int8scale_table;
+    std::map<std::string, std::vector<int>> blob_intscale_table;
+    std::map<std::string, std::vector<int>> weight_intscale_table;
 
 public:
     int quantize_convolution();
@@ -698,38 +768,38 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             // write int8_scale data
             if (op->int8_scale_term)
             {
-                std::vector<float> weight_int8scale;
-                std::vector<float> blob_int8scale;
+                std::vector<int> weight_intscale;
+                std::vector<int> blob_intscale;
 
                 char key[256];
                 sprintf(key, "%s_param_0", layers[i]->name.c_str());
 
-                if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                if (weight_intscale_table.find(std::string(key)) != weight_intscale_table.end())
                 {
-                    weight_int8scale = weight_int8scale_table[std::string(key)];
+                    weight_intscale = weight_intscale_table[std::string(key)];
                 }
 
-                if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                if (blob_intscale_table.find(layer->name) != blob_intscale_table.end())
                 {
-                    blob_int8scale = blob_int8scale_table[layer->name];
+                    blob_intscale = blob_intscale_table[layer->name];
                 }
 
                 // write int8_scale data
-                fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
-                fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+                fwrite(weight_intscale.data(), sizeof(int), weight_intscale.size(), bp);
+                fwrite(blob_intscale.data(), sizeof(int), blob_intscale.size(), bp);
 
-                for (int j = i + 1; j < layer_count; j++)
-                {
-                    const ncnn::Layer *layer = layers[j];
-                    sprintf(key, "%s_param_0", layer->name.c_str());
-                    if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
-                    {
-                        std::vector<float> next_blob_int8scale;
-                        next_blob_int8scale = blob_int8scale_table[layer->name];
-                        fwrite(next_blob_int8scale.data(), sizeof(float), next_blob_int8scale.size(), bp);
-                        break;
-                    }
-                }
+                // for (int j = i + 1; j < layer_count; j++)
+                // {
+                //     const ncnn::Layer *layer = layers[j];
+                //     sprintf(key, "%s_param_0", layer->name.c_str());
+                //     if (blob_intscale_table.find(layer->name) != blob_intscale_table.end())
+                //     {
+                //         std::vector<int> next_blob_intscale;
+                //         next_blob_intscale = blob_intscale_table[layer->name];
+                //         fwrite(next_blob_intscale.data(), sizeof(int), next_blob_intscale.size(), bp);
+                //         break;
+                //     }
+                // }
             }
         }
         else if (layer->type == "ConvolutionDepthWise")
@@ -782,38 +852,38 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             // write int8_scale data
             if (op->int8_scale_term)
             {
-                std::vector<float> weight_int8scale;
-                std::vector<float> blob_int8scale;
+                std::vector<int> weight_intscale;
+                std::vector<int> blob_intscale;
 
                 char key[256];
                 sprintf(key, "%s_param_0", layers[i]->name.c_str());
 
-                if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                if (weight_intscale_table.find(std::string(key)) != weight_intscale_table.end())
                 {
-                    weight_int8scale = weight_int8scale_table[std::string(key)];
+                    weight_intscale = weight_intscale_table[std::string(key)];
                 }
 
-                if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                if (blob_intscale_table.find(layer->name) != blob_intscale_table.end())
                 {
-                    blob_int8scale = blob_int8scale_table[layer->name];
+                    blob_intscale = blob_intscale_table[layer->name];
                 }
 
                 // write int8_scale data
-                fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
-                fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+                fwrite(weight_intscale.data(), sizeof(int), weight_intscale.size(), bp);
+                fwrite(blob_intscale.data(), sizeof(int), blob_intscale.size(), bp);
 
-                for (int j = i + 1; j < layer_count; j++)
-                {
-                    const ncnn::Layer *layer = layers[j];
-                    sprintf(key, "%s_param_0", layer->name.c_str());
-                    if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
-                    {
-                        std::vector<float> next_blob_int8scale;
-                        next_blob_int8scale = blob_int8scale_table[layer->name];
-                        fwrite(next_blob_int8scale.data(), sizeof(float), next_blob_int8scale.size(), bp);
-                        break;
-                    }
-                }
+                // for (int j = i + 1; j < layer_count; j++)
+                // {
+                //     const ncnn::Layer *layer = layers[j];
+                //     sprintf(key, "%s_param_0", layer->name.c_str());
+                //     if (blob_intscale_table.find(layer->name) != blob_intscale_table.end())
+                //     {
+                //         std::vector<int> next_blob_intscale;
+                //         next_blob_intscale = blob_intscale_table[layer->name];
+                //         fwrite(next_blob_intscale.data(), sizeof(float), next_blob_intscale.size(), bp);
+                //         break;
+                //     }
+                // }
             }
         }
         else if (layer->type == "Crop")
@@ -1004,38 +1074,38 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             // write int8_scale data
             if (op->int8_scale_term)
             {
-                std::vector<float> weight_int8scale;
-                std::vector<float> blob_int8scale;
+                std::vector<int> weight_intscale;
+                std::vector<int> blob_intscale;
 
                 char key[256];
                 sprintf(key, "%s_param_0", layers[i]->name.c_str());
 
-                if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                if (weight_intscale_table.find(std::string(key)) != weight_intscale_table.end())
                 {
-                    weight_int8scale = weight_int8scale_table[std::string(key)];
+                    weight_intscale = weight_intscale_table[std::string(key)];
                 }
 
-                if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                if (blob_intscale_table.find(layer->name) != blob_intscale_table.end())
                 {
-                    blob_int8scale = blob_int8scale_table[layer->name];
+                    blob_intscale = blob_intscale_table[layer->name];
                 }
 
                 // write int8_scale data
-                fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
-                fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+                fwrite(weight_intscale.data(), sizeof(int), weight_intscale.size(), bp);
+                fwrite(blob_intscale.data(), sizeof(int), blob_intscale.size(), bp);
 
-                for (int j = i + 1; j < layer_count; j++)
-                {
-                    const ncnn::Layer *layer = layers[j];
-                    sprintf(key, "%s_param_0", layer->name.c_str());
-                    if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
-                    {
-                        std::vector<float> next_blob_int8scale;
-                        next_blob_int8scale = blob_int8scale_table[layer->name];
-                        fwrite(next_blob_int8scale.data(), sizeof(float), next_blob_int8scale.size(), bp);
-                        break;
-                    }
-                }
+                // for (int j = i + 1; j < layer_count; j++)
+                // {
+                //     const ncnn::Layer *layer = layers[j];
+                //     sprintf(key, "%s_param_0", layer->name.c_str());
+                //     if (blob_intscale_table.find(layer->name) != blob_intscale_table.end())
+                //     {
+                //         std::vector<int> next_blob_intscale;
+                //         next_blob_intscale = blob_intscale_table[layer->name];
+                //         fwrite(next_blob_intscale.data(), sizeof(int), next_blob_intscale.size(), bp);
+                //         break;
+                //     }
+                // }
             }
         }
         else if (layer->type == "Input")
@@ -1421,9 +1491,9 @@ int NetQuantize::save(const char *parampath, const char *binpath)
 
 int main(int argc, char **argv)
 {
-    if (argc != 6)
+    if (argc != 7)
     {
-        fprintf(stderr, "usage: %s [inparam] [inbin] [outparam] [outbin] [calibration table]\n", argv[0]);
+        fprintf(stderr, "usage: %s [inparam] [inbin] [outparam] [outbin] [calibration table] [calibration int table]\n", argv[0]);
         return -1;
     }
 
@@ -1431,17 +1501,25 @@ int main(int argc, char **argv)
     const char *inbin = argv[2];
     const char *outparam = argv[3];
     const char *outbin = argv[4];
-    const char *int8scale_table_path = argv[5];
+    const char *floatscale_table_path = argv[5];
+    const char *intscale_table_path = argv[6];
 
     NetQuantize quantizer;
 
     // parse the calibration scale table
-    if (int8scale_table_path)
+    if (floatscale_table_path && intscale_table_path)
     {
-        bool s2 = read_int8scale_table(int8scale_table_path, quantizer.blob_int8scale_table, quantizer.weight_int8scale_table);
+        bool s2 = read_floatscale_table(floatscale_table_path, quantizer.blob_int8scale_table, quantizer.weight_int8scale_table);
         if (!s2)
         {
             fprintf(stderr, "read_int8scale_table failed\n");
+            return -1;
+        }
+
+        bool s3 = read_intscale_table(intscale_table_path, quantizer.blob_intscale_table, quantizer.weight_intscale_table);
+        if (!s3)
+        {
+            fprintf(stderr, "read_intsscale_table failed\n");
             return -1;
         }
     }

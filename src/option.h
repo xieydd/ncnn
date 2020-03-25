@@ -92,6 +92,8 @@ public:
     bool use_shader_pack8;
 
     bool use_int32_storage;
+
+    bool use_int_internal;
 };
 
 } // namespace ncnn

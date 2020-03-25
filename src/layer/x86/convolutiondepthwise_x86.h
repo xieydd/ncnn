@@ -17,24 +17,27 @@
 
 #include "convolutiondepthwise.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class ConvolutionDepthWise_x86 : virtual public ConvolutionDepthWise
 {
 public:
     ConvolutionDepthWise_x86();
 
-    virtual int create_pipeline(const Option& opt);
-    virtual int destroy_pipeline(const Option& opt);
+    virtual int create_pipeline(const Option &opt);
+    virtual int destroy_pipeline(const Option &opt);
 
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 protected:
-    int forward_int8_x86(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    int forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
-    Layer* activation;
-    std::vector<ncnn::Layer*> group_ops;
+    Layer *activation;
+    std::vector<ncnn::Layer *> group_ops;
+    int position_scale_in = 18;
+    int position_bottom_scale = 5;
 };
 
 } // namespace ncnn

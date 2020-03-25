@@ -17,23 +17,24 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Convolution : public Layer
 {
 public:
     Convolution();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int load_model(const ModelBin& mb);
+    virtual int load_model(const ModelBin &mb);
 
-    virtual int create_pipeline(const Option& opt);
+    virtual int create_pipeline(const Option &opt);
 
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 protected:
-    int forward_int8(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    int forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
     // param
@@ -44,7 +45,7 @@ public:
     int dilation_h;
     int stride_w;
     int stride_h;
-    int pad_left;// -233=SAME_UPPER -234=SAME_LOWER
+    int pad_left; // -233=SAME_UPPER -234=SAME_LOWER
     int pad_right;
     int pad_top;
     int pad_bottom;
@@ -64,12 +65,12 @@ public:
     Mat bias_data;
 
     Mat weight_data_int8_scales;
-    float bottom_blob_int8_scale;
-    float top_blob_int8_scale;// TODO load param
+    int bottom_blob_int8_scale;
+    float top_blob_int8_scale; // TODO load param
 
     bool use_int8_requantize;
 
-    // implementation type, 0 means do not use auto pack model 
+    // implementation type, 0 means do not use auto pack model
     int impl_type;
 };
 

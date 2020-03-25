@@ -17,14 +17,20 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Flatten : public Layer
 {
 public:
     Flatten();
 
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+    virtual int forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+    virtual int load_param(const ParamDict &pd);
+
+public:
+    int use_int8_inference;
 };
 
 } // namespace ncnn

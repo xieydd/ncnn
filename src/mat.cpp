@@ -30,11 +30,12 @@
 #endif // __ANDROID_API__ >= 26
 #endif // NCNN_VULKAN
 
-namespace ncnn {
-
-void Mat::substract_mean_normalize(const float* mean_vals, const float* norm_vals)
+namespace ncnn
 {
-    Layer* op;
+
+void Mat::substract_mean_normalize(const float *mean_vals, const float *norm_vals)
+{
+    Layer *op;
 
     if (mean_vals && !norm_vals)
     {
@@ -48,7 +49,7 @@ void Mat::substract_mean_normalize(const float* mean_vals, const float* norm_val
 
         Mat weights[1];
         weights[0] = Mat(c);
-        for (int q=0; q<c; q++)
+        for (int q = 0; q < c; q++)
         {
             weights[0][q] = -mean_vals[q];
         }
@@ -67,7 +68,7 @@ void Mat::substract_mean_normalize(const float* mean_vals, const float* norm_val
 
         Mat weights[1];
         weights[0] = Mat(c);
-        for (int q=0; q<c; q++)
+        for (int q = 0; q < c; q++)
         {
             weights[0][q] = norm_vals[q];
         }
@@ -88,10 +89,10 @@ void Mat::substract_mean_normalize(const float* mean_vals, const float* norm_val
         Mat weights[2];
         weights[0] = Mat(c);
         weights[1] = Mat(c);
-        for (int q=0; q<c; q++)
+        for (int q = 0; q < c; q++)
         {
             weights[0][q] = norm_vals[q];
-            weights[1][q] = - mean_vals[q] * norm_vals[q];
+            weights[1][q] = -mean_vals[q] * norm_vals[q];
         }
 
         op->load_model(ModelBinFromMatArray(weights));
@@ -102,7 +103,7 @@ void Mat::substract_mean_normalize(const float* mean_vals, const float* norm_val
     }
 
     Option opt;
-    opt.num_threads = 1;// TODO
+    opt.num_threads = 1; // TODO
 
     op->create_pipeline(opt);
 
@@ -113,13 +114,13 @@ void Mat::substract_mean_normalize(const float* mean_vals, const float* norm_val
     delete op;
 }
 
-Mat Mat::from_float16(const unsigned short* data, int size)
+Mat Mat::from_float16(const unsigned short *data, int size)
 {
     Mat m(size);
     if (m.empty())
         return m;
 
-    float* ptr = m;//.data;
+    float *ptr = m; //.data;
 
 #if __ARM_NEON && (__ARM_FP & 2)
     int nn = cpu_support_arm_vfpv4() ? size >> 2 : 0;
@@ -132,45 +133,43 @@ Mat Mat::from_float16(const unsigned short* data, int size)
 #if __aarch64__
     if (nn > 0)
     {
-    asm volatile(
-        "0:                             \n"
-        "ld1    {v0.4h}, [%1], #8       \n"
-        "fcvtl  v1.4s, v0.4h            \n"
-        "subs   %w0, %w0, #1            \n"
-        "st1    {v1.4s}, [%2], #16      \n"
-        "bne    0b                      \n"
-        : "=r"(nn),     // %0
-          "=r"(data),   // %1
-          "=r"(ptr)     // %2
-        : "0"(nn),
-          "1"(data),
-          "2"(ptr)
-        : "cc", "memory", "v0", "v1"
-    );
+        asm volatile(
+            "0:                             \n"
+            "ld1    {v0.4h}, [%1], #8       \n"
+            "fcvtl  v1.4s, v0.4h            \n"
+            "subs   %w0, %w0, #1            \n"
+            "st1    {v1.4s}, [%2], #16      \n"
+            "bne    0b                      \n"
+            : "=r"(nn),   // %0
+              "=r"(data), // %1
+              "=r"(ptr)   // %2
+            : "0"(nn),
+              "1"(data),
+              "2"(ptr)
+            : "cc", "memory", "v0", "v1");
     }
 #else
     if (nn > 0)
     {
-    asm volatile(
-        "0:                             \n"
-        "pld        [%1, #64]           \n"
-        "vld1.s16   {d0}, [%1 :64]!     \n"
-        "vcvt.f32.f16 q1, d0            \n"
-        "subs       %0, #1              \n"
-        "vst1.f32   {d2-d3}, [%2 :128]! \n"
-        "bne        0b                  \n"
-        : "=r"(nn),     // %0
-          "=r"(data),   // %1
-          "=r"(ptr)     // %2
-        : "0"(nn),
-          "1"(data),
-          "2"(ptr)
-        : "cc", "memory", "q0", "q1"
-    );
+        asm volatile(
+            "0:                             \n"
+            "pld        [%1, #64]           \n"
+            "vld1.s16   {d0}, [%1 :64]!     \n"
+            "vcvt.f32.f16 q1, d0            \n"
+            "subs       %0, #1              \n"
+            "vst1.f32   {d2-d3}, [%2 :128]! \n"
+            "bne        0b                  \n"
+            : "=r"(nn),   // %0
+              "=r"(data), // %1
+              "=r"(ptr)   // %2
+            : "0"(nn),
+              "1"(data),
+              "2"(ptr)
+            : "cc", "memory", "q0", "q1");
     }
 #endif // __aarch64__
 #endif // __ARM_NEON
-    for (; remain>0; remain--)
+    for (; remain > 0; remain--)
     {
         *ptr = float16_to_float32(*data);
 
@@ -183,7 +182,7 @@ Mat Mat::from_float16(const unsigned short* data, int size)
 
 #if NCNN_VULKAN
 #if __ANDROID_API__ >= 26
-VkImageMat VkImageMat::from_android_hardware_buffer(AHardwareBuffer* hb, VkAndroidHardwareBufferImageAllocator* allocator)
+VkImageMat VkImageMat::from_android_hardware_buffer(AHardwareBuffer *hb, VkAndroidHardwareBufferImageAllocator *allocator)
 {
     AHardwareBuffer_Desc bufferDesc;
     AHardwareBuffer_describe(hb, &bufferDesc);
@@ -198,7 +197,7 @@ VkImageMat VkImageMat::from_android_hardware_buffer(AHardwareBuffer* hb, VkAndro
 
     m.data = allocator->fastMalloc(hb);
 
-    m.refcount = (int*)((unsigned char*)m.data + offsetof(VkImageMemory, refcount));
+    m.refcount = (int *)((unsigned char *)m.data + offsetof(VkImageMemory, refcount));
     *m.refcount = 1;
 
     return m;
@@ -209,8 +208,7 @@ VkImageMat VkImageMat::from_android_hardware_buffer(AHardwareBuffer* hb, VkAndro
 unsigned short float32_to_float16(float value)
 {
     // 1 : 8 : 23
-    union
-    {
+    union {
         unsigned int u;
         float f;
     } tmp;
@@ -239,7 +237,7 @@ unsigned short float32_to_float16(float value)
     else
     {
         // normalized
-        short newexp = exponent + (- 127 + 15);
+        short newexp = exponent + (-127 + 15);
         if (newexp >= 31)
         {
             // overflow, return infinity
@@ -279,8 +277,7 @@ float float16_to_float32(unsigned short value)
     //     fprintf(stderr, "%d %d %d\n", sign, exponent, significand);
 
     // 1 : 8 : 23
-    union
-    {
+    union {
         unsigned int u;
         float f;
     } tmp;
@@ -320,9 +317,9 @@ float float16_to_float32(unsigned short value)
     return tmp.f;
 }
 
-void copy_make_border(const Mat& src, Mat& dst, int top, int bottom, int left, int right, int type, float v, const Option& opt)
+void copy_make_border(const Mat &src, Mat &dst, int top, int bottom, int left, int right, int type, float v, const Option &opt)
 {
-    Layer* padding = create_layer(LayerType::Padding);
+    Layer *padding = create_layer(LayerType::Padding);
 
     ParamDict pd;
     pd.set(0, top);
@@ -331,6 +328,10 @@ void copy_make_border(const Mat& src, Mat& dst, int top, int bottom, int left, i
     pd.set(3, right);
     pd.set(4, type);
     pd.set(5, v);
+    if (opt.use_int8_arithmetic)
+    {
+        pd.set(7, 1);
+    }
 
     padding->load_param(pd);
 
@@ -343,9 +344,9 @@ void copy_make_border(const Mat& src, Mat& dst, int top, int bottom, int left, i
     delete padding;
 }
 
-void copy_cut_border(const Mat& src, Mat& dst, int top, int bottom, int left, int right, const Option& opt)
+void copy_cut_border(const Mat &src, Mat &dst, int top, int bottom, int left, int right, const Option &opt)
 {
-    Layer* crop = create_layer(LayerType::Crop);
+    Layer *crop = create_layer(LayerType::Crop);
 
     ParamDict pd;
     pd.set(0, left);
@@ -366,9 +367,9 @@ void copy_cut_border(const Mat& src, Mat& dst, int top, int bottom, int left, in
     delete crop;
 }
 
-void resize_bilinear(const Mat& src, Mat& dst, int w, int h, const Option& opt)
+void resize_bilinear(const Mat &src, Mat &dst, int w, int h, const Option &opt)
 {
-    Layer* interp = create_layer(LayerType::Interp);
+    Layer *interp = create_layer(LayerType::Interp);
 
     ParamDict pd;
     pd.set(0, 2);
@@ -386,9 +387,9 @@ void resize_bilinear(const Mat& src, Mat& dst, int w, int h, const Option& opt)
     delete interp;
 }
 
-void resize_bicubic(const Mat& src, Mat& dst, int w, int h, const Option& opt)
+void resize_bicubic(const Mat &src, Mat &dst, int w, int h, const Option &opt)
 {
-    Layer* interp = create_layer(LayerType::Interp);
+    Layer *interp = create_layer(LayerType::Interp);
 
     ParamDict pd;
     pd.set(0, 3);
@@ -406,9 +407,9 @@ void resize_bicubic(const Mat& src, Mat& dst, int w, int h, const Option& opt)
     delete interp;
 }
 
-void convert_packing(const Mat& src, Mat& dst, int _elempack, const Option& opt)
+void convert_packing(const Mat &src, Mat &dst, int _elempack, const Option &opt)
 {
-    Layer* packing = create_layer(LayerType::Packing);
+    Layer *packing = create_layer(LayerType::Packing);
 
     ParamDict pd;
     pd.set(0, _elempack);
@@ -424,9 +425,9 @@ void convert_packing(const Mat& src, Mat& dst, int _elempack, const Option& opt)
     delete packing;
 }
 
-void cast_float32_to_float16(const Mat& src, Mat& dst, const Option& opt)
+void cast_float32_to_float16(const Mat &src, Mat &dst, const Option &opt)
 {
-    Layer* cast = create_layer(LayerType::Cast);
+    Layer *cast = create_layer(LayerType::Cast);
 
     ParamDict pd;
     pd.set(0, 1);
@@ -443,9 +444,9 @@ void cast_float32_to_float16(const Mat& src, Mat& dst, const Option& opt)
     delete cast;
 }
 
-void cast_float16_to_float32(const Mat& src, Mat& dst, const Option& opt)
+void cast_float16_to_float32(const Mat &src, Mat &dst, const Option &opt)
 {
-    Layer* cast = create_layer(LayerType::Cast);
+    Layer *cast = create_layer(LayerType::Cast);
 
     ParamDict pd;
     pd.set(0, 2);
@@ -462,9 +463,9 @@ void cast_float16_to_float32(const Mat& src, Mat& dst, const Option& opt)
     delete cast;
 }
 
-void cast_int8_to_float32(const Mat& src, Mat& dst, const Option& opt)
+void cast_int8_to_float32(const Mat &src, Mat &dst, const Option &opt)
 {
-    Layer* cast = create_layer(LayerType::Cast);
+    Layer *cast = create_layer(LayerType::Cast);
 
     ParamDict pd;
     pd.set(0, 3);
@@ -481,9 +482,9 @@ void cast_int8_to_float32(const Mat& src, Mat& dst, const Option& opt)
     delete cast;
 }
 
-void cast_float32_to_bfloat16(const Mat& src, Mat& dst, const Option& opt)
+void cast_float32_to_bfloat16(const Mat &src, Mat &dst, const Option &opt)
 {
-    Layer* cast = create_layer(LayerType::Cast);
+    Layer *cast = create_layer(LayerType::Cast);
 
     ParamDict pd;
     pd.set(0, 1);
@@ -500,9 +501,9 @@ void cast_float32_to_bfloat16(const Mat& src, Mat& dst, const Option& opt)
     delete cast;
 }
 
-void cast_bfloat16_to_float32(const Mat& src, Mat& dst, const Option& opt)
+void cast_bfloat16_to_float32(const Mat &src, Mat &dst, const Option &opt)
 {
-    Layer* cast = create_layer(LayerType::Cast);
+    Layer *cast = create_layer(LayerType::Cast);
 
     ParamDict pd;
     pd.set(0, 4);
@@ -519,9 +520,9 @@ void cast_bfloat16_to_float32(const Mat& src, Mat& dst, const Option& opt)
     delete cast;
 }
 
-void quantize_float32_to_int8(const Mat& src, Mat& dst, float scale, const Option& opt)
+void quantize_float32_to_int8(const Mat &src, Mat &dst, float scale, const Option &opt)
 {
-    Layer* quantize = create_layer(LayerType::Quantize);
+    Layer *quantize = create_layer(LayerType::Quantize);
 
     ParamDict pd;
     pd.set(0, scale);
@@ -537,9 +538,29 @@ void quantize_float32_to_int8(const Mat& src, Mat& dst, float scale, const Optio
     delete quantize;
 }
 
-void dequantize_int32_to_float32(Mat& m, float scale, const float* bias, int bias_data_size, const Option& opt)
+void quantize_int_to_int8(const Mat &src, Mat &dst, int scale, int position_bottom_scale, int position_scale_in, const Option &opt)
 {
-    Layer* dequantize = create_layer(LayerType::Dequantize);
+    Layer *quantize = create_layer(LayerType::Quantize);
+
+    ParamDict pd;
+    pd.set(0, scale);
+    pd.set(1, position_bottom_scale);
+    pd.set(2, position_scale_in);
+
+    quantize->load_param(pd);
+
+    quantize->create_pipeline(opt);
+
+    quantize->forward(src, dst, opt);
+
+    quantize->destroy_pipeline(opt);
+
+    delete quantize;
+}
+
+void dequantize_int32_to_float32(Mat &m, float scale, const float *bias, int bias_data_size, const Option &opt)
+{
+    Layer *dequantize = create_layer(LayerType::Dequantize);
 
     ParamDict pd;
     pd.set(0, scale);
@@ -549,7 +570,7 @@ void dequantize_int32_to_float32(Mat& m, float scale, const float* bias, int bia
     dequantize->load_param(pd);
 
     Mat weights[1];
-    weights[0] = Mat(bias_data_size, (void*)bias);
+    weights[0] = Mat(bias_data_size, (void *)bias);
 
     dequantize->load_model(ModelBinFromMatArray(weights));
 
@@ -562,9 +583,9 @@ void dequantize_int32_to_float32(Mat& m, float scale, const float* bias, int bia
     delete dequantize;
 }
 
-void requantize_int8_to_int8(const Mat& src, Mat& dst, float scale_in, float scale_out, const float* bias, int bias_data_size, int fusion_relu, const Option& opt)
+void requantize_int8_to_int8(const Mat &src, Mat &dst, float scale_in, float scale_out, const float *bias, int bias_data_size, int fusion_relu, const Option &opt)
 {
-    Layer* requantize = create_layer(LayerType::Requantize);
+    Layer *requantize = create_layer(LayerType::Requantize);
 
     ParamDict pd;
     pd.set(0, scale_in);
@@ -576,7 +597,7 @@ void requantize_int8_to_int8(const Mat& src, Mat& dst, float scale_in, float sca
     requantize->load_param(pd);
 
     Mat weights[1];
-    weights[0] = Mat(bias_data_size, (void*)bias);
+    weights[0] = Mat(bias_data_size, (void *)bias);
 
     requantize->load_model(ModelBinFromMatArray(weights));
 
