@@ -38,7 +38,7 @@ int Concat::forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_
 {
     if (use_int8_inference)
     {
-        forward_int8(bottom_blobs, top_blobs, opt);
+        return forward_int8(bottom_blobs, top_blobs, opt);
     }
     int dims = bottom_blobs[0].dims;
     size_t elemsize = bottom_blobs[0].elemsize;
@@ -317,21 +317,41 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
         }
 
         Mat &top_blob = top_blobs[0];
+        const char *type_name = "output";
         top_blob.create(w, top_h, elemsize, opt.blob_allocator);
         if (top_blob.empty())
             return -100;
 
         int *outptr = top_blob;
-        for (size_t b = 0; b < bottom_blobs.size(); b++)
+        if (strcmp(type_name, name.c_str()) == 0)
         {
-            const Mat &bottom_blob = bottom_blobs[b];
+            for (size_t b = 0; b < bottom_blobs.size(); b++)
+            {
+                const Mat &bottom_blob = bottom_blobs[b];
 
-            int size = w * bottom_blob.h;
+                int size = w * bottom_blob.h;
 
-            const int *ptr = bottom_blob;
-            memcpy(outptr, ptr, size * elemsize);
+                const int *ptr = bottom_blob;
+                for (int i = 0; i < size; i++)
+                {
+                    outptr[i] = 1.0f * ptr[i] / pow(2, position_scale_in);
+                }
+                outptr += size;
+            }
+        }
+        else
+        {
+            for (size_t b = 0; b < bottom_blobs.size(); b++)
+            {
+                const Mat &bottom_blob = bottom_blobs[b];
 
-            outptr += size;
+                int size = w * bottom_blob.h;
+
+                const int *ptr = bottom_blob;
+                memcpy(outptr, ptr, size * elemsize);
+
+                outptr += size;
+            }
         }
 
         return 0;

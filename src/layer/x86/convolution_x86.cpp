@@ -52,6 +52,7 @@ int Convolution_x86::create_pipeline(const Option &opt)
         activation = ncnn::create_layer(ncnn::LayerType::ReLU);
 
         ncnn::ParamDict pd;
+        pd.set(7, 1);
         activation->load_param(pd);
     }
     else if (activation_type == 2)
@@ -356,7 +357,7 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
         opt_g.use_int_internal = true;
 
         //quantize_float32_to_int8(bottom_blob, bottom_blob_unbordered, bottom_blob_int8_scale, opt_g);
-        const char *get_name = "260";
+        const char *get_name = "429";
         if (strcmp(get_name, name.c_str()))
         {
             Mat a = bottom_blob;

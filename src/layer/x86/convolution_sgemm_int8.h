@@ -840,7 +840,7 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int i = remain_outch_start; i < outch; i++)
         {
-            float *output = top_blob.channel(i);
+            int *output = top_blob.channel(i);
 
             const int32_t bias0 = bias ? bias[i] : 0;
             // const float scale_dequant0 = scale_dequant[i];

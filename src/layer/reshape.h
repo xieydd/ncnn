@@ -17,16 +17,18 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Reshape : public Layer
 {
 public:
     Reshape();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+    virtual int forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
     // reshape flag
@@ -38,6 +40,7 @@ public:
     int c;
     int permute;
     int ndim;
+    int use_int8_inference;
 };
 
 } // namespace ncnn

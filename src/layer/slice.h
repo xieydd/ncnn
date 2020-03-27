@@ -17,20 +17,23 @@
 
 #include "layer.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 class Slice : public Layer
 {
 public:
     Slice();
 
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
-    virtual int forward(const std::vector<Mat>& bottom_blobs, std::vector<Mat>& top_blobs, const Option& opt) const;
+    virtual int forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const;
+    virtual int forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const;
 
 public:
     Mat slices;
     int axis;
+    int use_int8_inference;
 };
 
 } // namespace ncnn
