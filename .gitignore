@@ -43,3 +43,7 @@ build*/
 # IDE
 .vs
 .vscode
+
+# Test
+mbv2/*
+shufflenetv2/*

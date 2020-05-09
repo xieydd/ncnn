@@ -532,9 +532,9 @@ int Net::load_model(const DataReader &dr)
 
     fuse_network();
 
-    for (size_t i=0; i<layers.size(); i++)
+    for (size_t i = 0; i < layers.size(); i++)
     {
-        Layer* layer = layers[i];
+        Layer *layer = layers[i];
 
         //Here we found inconsistent content in the parameter file.
         if (!layer)
@@ -912,7 +912,7 @@ int Net::fuse_network()
                     bool all_conv = true;
                     for (size_t i = 0; i < layer_next->tops.size(); i++)
                     {
-                        int layer_next_2_index = blobs[layer_next_2->tops[i]].consumers[0];
+                        int layer_next_2_index = blobs[layer_next->tops[i]].consumers[0];
                         if (layers[layer_next_2_index]->type != "Convolution" && layers[layer_next_2_index]->type != "ConvolutionDepthWise" && layers[layer_next_3_index]->type != "PriorBox")
                         {
                             // fprintf(stderr, "%s, %s, %s, %s\n", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str(), layers[layer_next_3_index]->name.c_str());
