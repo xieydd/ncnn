@@ -12,6 +12,7 @@ endif()
 message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
 
 cmake_minimum_required(VERSION 2.8.12)
+set(OpenCV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ncnn_quantize/3rdparty/opencv-3.4.2_install/share/OpenCV)
 add_definitions("-std=c++11")
 
 if(NOT CMAKE_BUILD_TYPE)

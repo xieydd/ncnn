@@ -30,6 +30,7 @@ public:
 
 public:
     int group;
+    int num_output;
 };
 
 } // namespace ncnn

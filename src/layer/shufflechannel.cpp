@@ -27,6 +27,7 @@ ShuffleChannel::ShuffleChannel()
 int ShuffleChannel::load_param(const ParamDict& pd)
 {
     group = pd.get(0, 1);
+    num_output = pd.get(1, 24); 
 
     return 0;
 }

@@ -12,9 +12,13 @@ if(OpenCV_FOUND)
     add_executable(ncnn2int8 ncnn2int8.cpp)
     target_link_libraries(ncnn2int8 PRIVATE ncnn)
 
+    add_executable(ncnn2int8_new ncnn2int8_new.cpp)
+    target_link_libraries(ncnn2int8_new PRIVATE ncnn)
+
     # add all ncnn2table and ncnn2int8 tool to a virtual project group
     set_property(TARGET ncnn2table PROPERTY FOLDER "tools/optimization")
     set_property(TARGET ncnn2int8 PROPERTY FOLDER "tools/optimization")
+    set_property(TARGET ncnn2int8_new PROPERTY FOLDER "tools/optimization")
 else()
     message(WARNING "OpenCV not found, quantize tools won't be built")
 endif()
