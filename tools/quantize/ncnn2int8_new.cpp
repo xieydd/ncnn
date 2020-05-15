@@ -165,7 +165,7 @@ public:
     int find_top_scale();
     std::string find_first_conv(std::string name);
     std::string find_first_shufflechannel(std::string name);
-    void fill_scale_shufflechannel(std::vector<float> &layer_scale, int expected_layer_size, std::vector<int> status, std::set<int> &visited, std::string layer_name);
+    void fill_scale_shufflechannel(std::vector<float> &layer_scale, int expected_layer_size, std::vector<int> status, std::set<int> &visited, std::string layer_name, bool left);
 
 public:
     int fprintf_param_int_array(int id, const ncnn::Mat &m, FILE *pp);
@@ -186,16 +186,15 @@ int NetQuantize::find_top_scale()
         if (layer->type == "Convolution" || layer->type == "ConvolutionDepthWise")
         {
             std::string layer_name = layer->name;
-            char weight_key[256];
-            sprintf(weight_key, "%s_param_0", layer_name.c_str());
+            //char weight_key[256];
+            //sprintf(weight_key, "%s_param_0", layer_name.c_str());
             // std::map<std::string, std::vector<float>>::iterator iter_data = blob_int8scale_table.find(layer_name);
             // std::map<std::string, std::vector<float>>::iterator iter = weight_int8scale_table.find(weight_key);
             // std::vector<float> weight_data_int8_scales = iter->second;
             // std::vector<float> blob_int8_scales = iter_data->second;
-            fprintf(stderr, "forward_layer %s\n", layer->name.c_str());
+            // fprintf(stderr, "forward_layer %s\n", layer->name.c_str());
             for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
             {
-                //fprintf(stderr, "forward_layer %d %s\n", i, layer->name.c_str());
                 int layer_next_index = blobs[layer->tops[0]].consumers[n];
                 ncnn::Layer *layer_next = layers[layer_next_index];
                 if (layer_next->type == "Split")
@@ -293,9 +292,127 @@ int NetQuantize::find_top_scale()
                             out_channels = ((ncnn::ConvolutionDepthWise *)layer)->num_output;
                         }
                         std::vector<float> layer_scale;
+                        layer_scale.resize(out_channels * 2);
                         std::vector<int> status;
+                        for (int i = 0; i < out_channels * 2; i++)
+                        {
+                            status.push_back(i);
+                        }
                         std::set<int> visited;
-                        fill_scale_shufflechannel(layer_scale, out_channels, status, visited, layer->name);
+                        // conv on left or right
+                        // if (layer_name == "673")
+                        //     fprintf(stdout, "673\n");
+                        bool left = true;
+                        {
+                            if (layer_next->bottoms.size() == 2)
+                            {
+                                // int debug_index = find_layer_index_by_name(layer->name.c_str());
+                                // int debug_index2 = blobs[layer_next->bottoms[1]].producer;
+                                if (find_layer_index_by_name(layer->name.c_str()) == blobs[layer_next->bottoms[1]].producer)
+                                {
+                                    left = false;
+                                }
+                            }
+                        }
+                        fill_scale_shufflechannel(layer_scale, out_channels, status, visited, layer->name, left);
+
+                        if (left)
+                        {
+                            for (int i = 0; i < layer_scale.size() / 2; i++)
+                            {
+                                top_blob_int8scale_table[layer_name].push_back(layer_scale[i]);
+                            }
+                        }
+                        else
+                        {
+                            for (int i = layer_scale.size() / 2 - 1; i < layer_scale.size(); i++)
+                            {
+                                top_blob_int8scale_table[layer_name].push_back(layer_scale[i]);
+                            }
+                        }
+                        continue;
+                    }
+                    else
+                    {
+                        std::string first_conv_name = find_first_conv(layer->name);
+                        if (blob_int8scale_table.count(first_conv_name) > 0)
+                        {
+                            top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[first_conv_name][0]);
+                        }
+                        else
+                        {
+                            // if not find conv is rest layer, it will be fake number 1.0
+                            top_blob_int8scale_table[layer_name].push_back(1.0);
+                        }
+                    }
+                }
+                else if (layer_next->type == "BinaryOp")
+                {
+                    int layer_next_1_index = blobs[layer_next->tops[0]].consumers[n];
+                    ncnn::Layer *layer_next_1 = layers[layer_next_1_index];
+                    if (layer_next_1->type == "Split")
+                    {
+                        bool all_conv = true;
+                        std::string layer_next_2_name = "NULL";
+                        for (size_t i = 0; i < layer_next_1->tops.size(); i++)
+                        {
+                            int layer_next_2_index = blobs[layer_next_1->tops[i]].consumers[0];
+                            if (layers[layer_next_2_index]->type != "Convolution" && layers[layer_next_2_index]->type != "ConvolutionDepthWise")
+                            {
+                                // fprintf(stderr, "%s, %s, %s, %s\n", layer->name.c_str(), layer_next->name.c_str(), layer_next_2->name.c_str(), layers[layer_next_3_index]->name.c_str());
+                                all_conv = false;
+                            }
+                            if (all_conv)
+                            {
+                                layer_next_2_name = layers[layer_next_2_index]->name;
+                            }
+                        }
+                        bool condition1 = all_conv;
+
+                        bool condition2 = false;
+                        std::string layer_next_2_name_0 = "NULL"; // Conv/ConvDW
+                        std::string layer_next_2_name_1 = "NULL"; // Binary
+                        {
+                            if (layer_next_1->tops.size() == 2)
+                            {
+                                if ((layers[blobs[layer_next_1->tops[0]].consumers[0]]->type == "Convolution" ||
+                                     layers[blobs[layer_next_1->tops[0]].consumers[0]]->type == "ConvolutionDepthWise") &&
+                                    (layers[blobs[layer_next_1->tops[1]].consumers[0]]->type == "BinaryOp" || layers[blobs[layer_next_1->tops[1]].consumers[0]]->type == "Padding"))
+                                {
+                                    layer_next_2_name_0 = layers[blobs[layer_next_1->tops[0]].consumers[0]]->name;
+                                    layer_next_2_name_1 = layers[blobs[layer_next_1->tops[1]].consumers[0]]->name;
+                                }
+                                else if ((layers[blobs[layer_next_1->tops[1]].consumers[0]]->type == "Convolution" ||
+                                          layers[blobs[layer_next_1->tops[1]].consumers[0]]->type == "ConvolutionDepthWise") &&
+                                         (layers[blobs[layer_next_1->tops[0]].consumers[0]]->type == "BinaryOp" || layers[blobs[layer_next_1->tops[0]].consumers[0]]->type == "Padding"))
+                                {
+                                    layer_next_2_name_0 = layers[blobs[layer_next_1->tops[1]].consumers[0]]->name;
+                                    layer_next_2_name_1 = layers[blobs[layer_next_1->tops[0]].consumers[0]]->name;
+                                }
+
+                                condition2 = true;
+                            }
+                        }
+
+                        bool condition3 = false;
+
+                        // condition 1
+                        if (condition1)
+                        {
+                            top_blob_int8scale_table[layer_name] = blob_int8scale_table[layer_next_2_name];
+                        }
+                        // condition 2
+                        else if (condition2)
+                        {
+                            top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[layer_next_2_name_0][0]);
+                            std::string first_conv_name = find_first_conv(layer_next_2_name_1);
+                            top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[first_conv_name][0]);
+                        }
+                        else
+                        {
+                            fprintf(stderr, "Condition have not be considered\n");
+                            return -1;
+                        }
                     }
                     else
                     {
@@ -314,7 +431,16 @@ int NetQuantize::find_top_scale()
                 else
                 {
                     // for last condition 4, convolution have no output scale, fake number 1.0
-                    top_blob_int8scale_table[layer_name].push_back(1.0);
+                    std::string first_conv_name = find_first_conv(layer->name);
+                    if (blob_int8scale_table.count(first_conv_name) > 0)
+                    {
+                        top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[first_conv_name][0]);
+                    }
+                    else
+                    {
+                        // if not find conv is rest layer, it will be fake number 1.0
+                        top_blob_int8scale_table[layer_name].push_back(1.0);
+                    }
                 }
             }
         }
@@ -329,9 +455,9 @@ std::string NetQuantize::find_first_conv(std::string name)
     {
         return layer->name;
     }
-    for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
+    if (layer->type == "Slice")
     {
-        int layer_next_index = blobs[layer->tops[0]].consumers[n];
+        int layer_next_index = blobs[layer->tops[1]].consumers[0];
         ncnn::Layer *layer_next = layers[layer_next_index];
         if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise" || layer_next->type == "InnerProduct")
         {
@@ -340,6 +466,22 @@ std::string NetQuantize::find_first_conv(std::string name)
         else
         {
             return find_first_conv(layer_next->name);
+        }
+    }
+    else
+    {
+        for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
+        {
+            int layer_next_index = blobs[layer->tops[0]].consumers[n];
+            ncnn::Layer *layer_next = layers[layer_next_index];
+            if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise" || layer_next->type == "InnerProduct")
+            {
+                return layer_next->name;
+            }
+            else
+            {
+                return find_first_conv(layer_next->name);
+            }
         }
     }
 }
@@ -368,78 +510,201 @@ std::string NetQuantize::find_first_shufflechannel(std::string name)
     }
 }
 
-void NetQuantize::fill_scale_shufflechannel(std::vector<float> &layer_scale, int expected_layer_size, std::vector<int> status, std::set<int> &visited, std::string layer_name)
+void NetQuantize::fill_scale_shufflechannel(std::vector<float> &layer_scale, int expected_layer_size, std::vector<int> status, std::set<int> &visited, std::string layer_name, bool left)
 {
+    // fprintf(stderr, "forward_layer %s\n", layer_name.c_str());
+    // for (int i = 0; i < layer_scale.size(); i++)
+    // {
+    //     fprintf(stdout, "%f ", layer_scale[i]);
+    // }
+    // fprintf(stdout, "\n");
+
     if (visited.size() == expected_layer_size)
         return;
 
-    std::vector<int> new_status;
     //[ 0, 1, 2, 3, 4, 5, 6, 7 ]
     // status [0 4 1 5 2 6 3 7]
     // new_status  [0 2 4 6 1 3 5 7]
     //int first_shufflechannel_index = find_layer_index_by_name(find_first_shufflechannel(layer_name));
 
     ncnn::Layer *layer = layers[find_layer_index_by_name(layer_name.c_str())];
-    if (layer_name == "ShuffleChannel")
+    if (layer->type == "ShuffleChannel")
     {
-
         int size = ((ncnn::ShuffleChannel *)layer)->num_output;
+        std::vector<int> new_status;
+        new_status.resize(size);
+        // fprintf(stdout, "mm%d-%d", size, status.size());
         int chs_per_group = size / 2;
         int layer_next_index = blobs[layer->tops[0]].consumers[0];
         ncnn::Layer *layer_next = layers[layer_next_index];
-        if (layer_next->name == "Slice")
+
+        // if use shufflechannel, need change status
+        std::vector<int> now;
+        for (int i = 0; i < 2; i++)
         {
-            for (int i = 0; i < 2; i++)
+            for (int j = 0; j < chs_per_group; j++)
             {
-                for (int j = 0; j < chs_per_group; j++)
+                int src = chs_per_group * i + j;
+                int dst = 2 * j + i;
+                new_status[dst] = status[src];
+            }
+        }
+
+        if (layer_next->type == "Slice")
+        {
+            for (int i = size - 1; i >= size / 2; i--)
+            {
+                if (left && new_status[i] < chs_per_group)
                 {
-                    //int src = chs_per_group * i + j;
-                    int dst = 2 * j + i;
-                    new_status.push_back(status[dst]);
-                    if (i == 1)
+                    now.push_back(new_status[i]);
+                }
+
+                if (!left && new_status[i] >= chs_per_group)
+                {
+                    now.push_back(new_status[i]);
+                }
+            }
+
+            for (int i = 1; i >= 0; i--)
+            {
+                if (i == 1)
+                {
+                    for (int j = 0; j < now.size(); j++)
                     {
-                        if (!visited.count(status[dst]))
+                        if (!visited.count(now[j]))
                         {
-                            visited.insert(status[dst]);
+
                             // get scale
                             std::string conv_name = find_first_conv(layer_name);
-                            layer_scale[status[dst]] = blob_int8scale_table[conv_name][0];
+
+                            layer_scale[now[j]] = blob_int8scale_table.find(conv_name)->second[0];
+                            visited.insert(now[j]);
                         }
                     }
                 }
-            }
-            status.swap(new_status);
-        }
-        else if (layer_next->name == "Split")
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int dst = j;
-                new_status.push_back(status[dst]);
-                if (!visited.count(status[dst]))
+                else
                 {
-                    visited.insert(status[dst]);
-                    // get scale
-                    std::string conv_name = find_first_conv(layer_name);
-                    layer_scale[status[dst]] = blob_int8scale_table[conv_name][0];
+                    for (size_t k = 0; k < layer->tops.size(); k++)
+                    {
+                        int layer_next_index = blobs[layer->tops[k]].consumers[0];
+                        ncnn::Layer *layer_next = layers[layer_next_index];
+                        fill_scale_shufflechannel(layer_scale, expected_layer_size, new_status, visited, layer_next->name, left);
+                        return;
+                    }
                 }
             }
-            status.swap(new_status);
+
+            /*
+            for (int i = 1; i >= 0; i--)
+            {
+                for (int j = 0; j < chs_per_group; j++)
+                {
+                    int src = chs_per_group * i + j;
+                    int dst = 2 * j + i;
+                    //new_status.push_back(status[dst]);
+                    if (i == 1)
+                    {
+                        if (left && (src < chs_per_group))
+                        {
+                            if (!visited.count(status[dst]))
+                            {
+                                visited.insert(status[dst]);
+                                // get scale
+                                std::string conv_name = find_first_conv(layer_name);
+
+                                layer_scale[status[dst]] = blob_int8scale_table.find(conv_name)->second[0];
+                            }
+                        }
+
+                        if (!left && (src >= chs_per_group))
+                        {
+                            if (!visited.count(status[dst]))
+                            {
+                                visited.insert(status[dst]);
+                                // get scale
+                                std::string conv_name = find_first_conv(layer_name);
+                                layer_scale[status[dst]] = blob_int8scale_table.find(conv_name)->second[0];
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (size_t k = 0; k < layer->tops.size(); k++)
+                        {
+                            int layer_next_index = blobs[layer->tops[k]].consumers[0];
+                            ncnn::Layer *layer_next = layers[layer_next_index];
+                            fill_scale_shufflechannel(layer_scale, expected_layer_size, status, visited, layer_next->name, left);
+                        }
+                        //return;
+                        // if s(!visited.count(status[dst]))
+                        // {
+                        //     visited.insert(status[dst]);
+                        // }
+                    }
+                }
+            }
+            */
+            // for (int i = 0; i < 2; i++)
+            // {
+            //     for (int j = 0; j < chs_per_group; j++)
+            //     {
+            //         if (i == 0)
+            //         {
+            //             for (size_t i = 0; i < layer->tops.size(); i++)
+            //             {
+            //                 int layer_next_index = blobs[layer->tops[i]].consumers[0];
+            //                 ncnn::Layer *layer_next = layers[layer_next_index];
+            //                 fill_scale_shufflechannel(layer_scale, expected_layer_size, status, visited, layer_next->name, left);
+            //             }
+            //             return;
+            //         }
+            //     }
+            // }
+            //status.swap(new_status);
+            return;
+        }
+        else if (layer_next->type == "Split")
+        {
+
+            for (int j = 0; j < status.size(); j++)
+            {
+                if (!visited.count(status[j]))
+                {
+
+                    // get scale
+                    std::string conv_name = find_first_conv(layer_name);
+
+                    layer_scale[status[j]] = blob_int8scale_table.find(conv_name)->second[0];
+                    visited.insert(status[j]);
+                }
+            }
+            return;
+        }
+        else if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise" || layer_next->type == "InnerProduct")
+        {
+            for (int i = 0; i < layer_scale.size(); i++)
+            {
+                if (!visited.count(i))
+                    layer_scale[i] = blob_int8scale_table[layer_next->name][0];
+            }
+            return;
         }
         else
         {
-            fprintf(stderr, "Not consider this condition\n");
-            fill_scale_shufflechannel(layer_scale, expected_layer_size, status, visited, layer_next->name);
+            fprintf(stderr, "Not consider this condition %s\n", layer_name.c_str());
+            return;
         }
     }
     else
     {
-        for (size_t i = 0; i < layer->tops.size(); i++)
+        for (size_t i = layer->tops.size() - 1; i >= 0; i--)
         {
             int layer_next_index = blobs[layer->tops[i]].consumers[0];
             ncnn::Layer *layer_next = layers[layer_next_index];
-            fill_scale_shufflechannel(layer_scale, expected_layer_size, status, visited, layer_next->name);
+            fill_scale_shufflechannel(layer_scale, expected_layer_size, status, visited, layer_next->name, left);
+            return;
         }
+        return;
     }
 }
 

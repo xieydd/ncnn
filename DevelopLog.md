@@ -1,7 +1,7 @@
 <!--
  * @Author: xieydd
  * @since: 2020-05-08 10:36:58
- * @lastTime: 2020-05-11 16:11:30
+ * @lastTime: 2020-05-15 16:49:53
  * @LastAuthor: Do not edit
  * @message: 
  -->
@@ -30,8 +30,8 @@ pooling   split
       flatten
       inner product
 3. 见下图
-conv0            conv1  # vector<float> conv0_next_scale, 假设 a0; a[2]=a[6]=a[3]=a[7]=conv2_scale_in  a[1]=a[5]=conv4_scale_in ... 直到vector填满为止
-                        # vector<float> conv1_next_scale, 假设 a1; Notice 这里要注意和下面的不一样
+conv0            conv1  # vector<float> conv0_next_scale, 假设 a; a[2]=a[3]=conv2_scale_in  a[1]=conv4_scale_in ... 直到vector填满为止
+                        # vector<float> conv1_next_scale, 假设 a1; Notice 这里要注意和下面的不一样 a1[4] = a1[5] = conv2_scale_in ; a1[6] = conv4_scale_in
         concat          # [0,1,2,3,4,5,6,7]
         shufflechannel  # [0 4 1 5 2 6 3 7]
         slice           # [0 4 1 5]  [2 6 3 7] 
@@ -43,8 +43,13 @@ conv0            conv1  # vector<float> conv0_next_scale, 假设 a0; a[2]=a[6]=a
         slice           # [0 2 4 6] [1 3 5 7]
 |               conv4
 
-4. Conv/convdw/inner product 后无 output_scale 直接输出, 这种情况暂时先做 float 输出
-5. Average Pool 的计算溢出问题，int32 作为暂存值，不会出现溢出问题
+4. 当 conv 后不是 split 而是跟 binaryop 后跟 split
+conv    |
+    binaryop
+    split
+conv    |    
+5. Conv/convdw/inner product 后无 output_scale 直接输出, 这种情况暂时先做 float 输出
+6. Average Pool 的计算溢出问题，int32 作为暂存值，不会出现溢出问题
 ```
 2. Prepared work
 ```s
