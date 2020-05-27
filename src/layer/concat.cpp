@@ -29,7 +29,7 @@ Concat::Concat()
 int Concat::load_param(const ParamDict &pd)
 {
     axis = pd.get(0, 0);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
 
     return 0;
 }
@@ -287,7 +287,7 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
         if (top_blob.empty())
             return -100;
 
-        int *outptr = top_blob;
+        signed char *outptr = top_blob;
         for (size_t b = 0; b < bottom_blobs.size(); b++)
         {
             const Mat &bottom_blob = bottom_blobs[b];
@@ -322,36 +322,17 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
         if (top_blob.empty())
             return -100;
 
-        int *outptr = top_blob;
-        if (strcmp(type_name, name.c_str()) == 0)
+        signed char *outptr = top_blob;
+        for (size_t b = 0; b < bottom_blobs.size(); b++)
         {
-            for (size_t b = 0; b < bottom_blobs.size(); b++)
-            {
-                const Mat &bottom_blob = bottom_blobs[b];
+            const Mat &bottom_blob = bottom_blobs[b];
 
-                int size = w * bottom_blob.h;
+            int size = w * bottom_blob.h;
 
-                const int *ptr = bottom_blob;
-                for (int i = 0; i < size; i++)
-                {
-                    outptr[i] = 1.0f * ptr[i] / pow(2, position_scale_in);
-                }
-                outptr += size;
-            }
-        }
-        else
-        {
-            for (size_t b = 0; b < bottom_blobs.size(); b++)
-            {
-                const Mat &bottom_blob = bottom_blobs[b];
+            const signed char *ptr = bottom_blob;
+            memcpy(outptr, ptr, size * elemsize);
 
-                int size = w * bottom_blob.h;
-
-                const int *ptr = bottom_blob;
-                memcpy(outptr, ptr, size * elemsize);
-
-                outptr += size;
-            }
+            outptr += size;
         }
 
         return 0;
@@ -378,12 +359,12 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int i = 0; i < h; i++)
         {
-            int *outptr = top_blob.row_int(i);
+            signed char *outptr = top_blob.row_signed_char(i);
             for (size_t b = 0; b < bottom_blobs.size(); b++)
             {
                 const Mat &bottom_blob = bottom_blobs[b];
 
-                const int *ptr = bottom_blob.row_int(i);
+                const signed char *ptr = bottom_blob.row_signed_char(i);
                 memcpy(outptr, ptr, bottom_blob.w * elemsize);
 
                 outptr += bottom_blob.w;
@@ -420,8 +401,8 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
             int channels = bottom_blob.c;
             size_t size = bottom_blob.cstep * channels;
 
-            const int *ptr = bottom_blob;
-            int *outptr = top_blob.channel(q);
+            const signed char *ptr = bottom_blob;
+            signed char *outptr = top_blob.channel(q);
             memcpy(outptr, ptr, size * elemsize);
 
             q += channels;
@@ -452,7 +433,7 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int q = 0; q < channels; q++)
         {
-            int *outptr = top_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (size_t b = 0; b < bottom_blobs.size(); b++)
             {
@@ -460,7 +441,7 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
 
                 int size = bottom_blob.w * bottom_blob.h;
 
-                const int *ptr = bottom_blob.channel(q);
+                const signed char *ptr = bottom_blob.channel(q);
                 memcpy(outptr, ptr, size * elemsize);
 
                 outptr += size;
@@ -492,7 +473,7 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int q = 0; q < channels; q++)
         {
-            int *outptr = top_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (int i = 0; i < h; i++)
             {
@@ -500,7 +481,7 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
                 {
                     const Mat &bottom_blob = bottom_blobs[b];
 
-                    const int *ptr = bottom_blob.channel(q).row_int(i);
+                    const signed char *ptr = bottom_blob.channel(q).row_signed_char(i);
                     memcpy(outptr, ptr, bottom_blob.w * elemsize);
 
                     outptr += bottom_blob.w;

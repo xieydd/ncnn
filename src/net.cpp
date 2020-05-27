@@ -20,6 +20,7 @@
 #include "convolution.h"
 #include "convolutiondepthwise.h"
 #include "relu.h"
+#include "input.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -1204,7 +1205,6 @@ int Net::forward_layer(int layer_index, std::vector<Mat> &blob_mats, Option &opt
     const Layer *layer = layers[layer_index];
 
     //     fprintf(stderr, "forward_layer %d %s\n", layer_index, layer->name.c_str());
-
     if (layer->one_blob_only)
     {
         // load bottom blob
@@ -1267,6 +1267,7 @@ int Net::forward_layer(int layer_index, std::vector<Mat> &blob_mats, Option &opt
             double end = get_current_time();
             benchmark(layer, bottom_blob, top_blob, start, end);
 #else
+            //fprintf(stdout, "nnnn %s\n", (layer->name).c_str());
             int ret = layer->forward(bottom_blob, top_blob, opt);
 #endif // NCNN_BENCHMARK
             if (ret != 0)
@@ -1355,7 +1356,6 @@ int Net::forward_layer(int layer_index, std::vector<Mat> &blob_mats, Option &opt
             for (size_t i = 0; i < layer->tops.size(); i++)
             {
                 int top_blob_index = layer->tops[i];
-
                 blob_mats[top_blob_index] = top_blobs[i];
             }
         }
@@ -2115,7 +2115,17 @@ int Extractor::input(int blob_index, const Mat &in)
     if (blob_index < 0 || blob_index >= (int)blob_mats.size())
         return -1;
 
-    blob_mats[blob_index] = in;
+    ncnn::Input *layer = (ncnn::Input *)(net->layers[blob_index]);
+    if (layer->use_int8_inference)
+    {
+        Mat out;
+        layer->forward_int8(in, out, opt);
+        blob_mats[blob_index] = out;
+    }
+    else
+    {
+        blob_mats[blob_index] = in;
+    }
 
     return 0;
 }

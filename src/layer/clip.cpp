@@ -41,7 +41,8 @@ int Clip::load_param(const ParamDict &pd)
 {
     min = pd.get(0, -FLT_MAX);
     max = pd.get(1, FLT_MAX);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
+    scales = pd.get(9, Mat());
 
     return 0;
 }
@@ -52,13 +53,42 @@ int Clip::forward_inplace_int8(Mat &bottom_top_blob, const Option &opt) const
     int h = bottom_top_blob.h;
     int channels = bottom_top_blob.c;
     int size = w * h;
-    int min_int8 = static_cast<int>(round(min));
-    int max_int8 = static_cast<int>(round(max));
+    std::vector<int> scales_v;
+
+    int scale_size = scales.w * scales.h * scales.c;
+    scales_v.resize(scale_size);
+    mat2vector(scales, scales_v);
+
+    // TODO Not pre-channel
+    int larger = scales_v[0];
+    int right_shift = scales_v[1];
+    if (scale_size == 3)
+    {
+        if (larger < scales_v[1])
+        {
+            larger = scales_v[1];
+        }
+        right_shift = scales_v[2];
+    }
 
 #pragma omp parallel for num_threads(opt.num_threads)
     for (int q = 0; q < channels; q++)
     {
         signed char *ptr = bottom_top_blob.channel(q);
+        int min_int8;
+        int max_int8;
+        if (right_shift < 0)
+        {
+            // TODO Only for relu6
+            min_int8 = 0;
+            max_int8 = static_cast<int>((int(max * larger) >> (-right_shift)) + 0.5) > 127 ? 127 : static_cast<int>((int(max * larger) >> (-right_shift)) + 0.5);
+            //fprintf(stdout, "xxxxxx %d\n", max_int8);
+        }
+        else
+        {
+            min_int8 = 0;
+            max_int8 = static_cast<int>((int(max * larger) << (right_shift)) + 0.5) > 127 ? 127 : static_cast<int>((int(max * larger) << (right_shift)) + 0.5);
+        }
 
         for (int i = 0; i < size; i++)
         {
@@ -105,7 +135,7 @@ int Clip::forward_inplace(Mat &bottom_top_blob, const Option &opt) const
 {
     if (use_int8_inference)
     {
-        return Clip::forward_inplace_int8(bottom_top_blob, opt);
+        return forward_inplace_int8(bottom_top_blob, opt);
     }
 
     int w = bottom_top_blob.w;
@@ -116,14 +146,14 @@ int Clip::forward_inplace(Mat &bottom_top_blob, const Option &opt) const
 #pragma omp parallel for num_threads(opt.num_threads)
     for (int q = 0; q < channels; q++)
     {
-        int *ptr = bottom_top_blob.channel(q);
+        float *ptr = bottom_top_blob.channel(q);
 
         for (int i = 0; i < size; i++)
         {
             if (ptr[i] < min)
-                ptr[i] = int(min);
+                ptr[i] = min;
             if (ptr[i] > max)
-                ptr[i] = int(max);
+                ptr[i] = max;
         }
     }
 

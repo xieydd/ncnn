@@ -34,7 +34,7 @@ int Padding::load_param(const ParamDict &pd)
     type = pd.get(4, 0);
     value = pd.get(5, 0.f);
     per_channel_pad_data_size = pd.get(6, 0);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
 
     if (top == -233 && bottom == -233 && left == -233 && right == -233)
     {
@@ -385,7 +385,7 @@ int Padding::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
         if (top_blob.empty())
             return -100;
 
-        copy_make_border_image<int>(bottom_blob, top_blob, 0, left, type, value);
+        copy_make_border_image<signed char>(bottom_blob, top_blob, 0, left, type, value);
         return 0;
     }
 
@@ -397,7 +397,7 @@ int Padding::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
         if (top_blob.empty())
             return -100;
 
-        copy_make_border_image<int>(bottom_blob, top_blob, top, left, type, value);
+        copy_make_border_image<signed char>(bottom_blob, top_blob, top, left, type, value);
 
         return 0;
     }
@@ -416,7 +416,7 @@ int Padding::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 
             int pad_value = per_channel_pad_data_size ? per_channel_pad_data[q] : value;
 
-            copy_make_border_image<int>(m, borderm, top, left, type, pad_value);
+            copy_make_border_image<signed char>(m, borderm, top, left, type, pad_value);
         }
 
         return 0;

@@ -37,6 +37,10 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option &opt)
         activation = ncnn::create_layer(ncnn::LayerType::ReLU);
 
         ncnn::ParamDict pd;
+        if (int8_scale_term)
+        {
+            pd.set(8, 1);
+        }
         activation->load_param(pd);
     }
     else if (activation_type == 2)
@@ -52,24 +56,17 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option &opt)
         activation = ncnn::create_layer(ncnn::LayerType::Clip);
 
         ncnn::ParamDict pd;
-        if (use_int8_requantize)
+        if (int8_scale_term)
         {
-            pd.set(0, activation_params[0] * top_blob_int8_scale); // min
-            pd.set(1, activation_params[1] * top_blob_int8_scale); // max
+            pd.set(0, activation_params[0]); // min
+            pd.set(1, activation_params[1]); // max
+            pd.set(8, 1);
+            pd.set(9, top_scales);
         }
         else
         {
-            if (int8_scale_term)
-            {
-                pd.set(0, activation_params[0] * int(pow(2, position_scale_in))); // min
-                pd.set(1, activation_params[1] * int(pow(2, position_scale_in))); // max
-                pd.set(7, 1);
-            }
-            else
-            {
-                pd.set(0, activation_params[0]); // min
-                pd.set(1, activation_params[1]); // max
-            }
+            pd.set(0, activation_params[0]); // min
+            pd.set(1, activation_params[1]); // max
         }
 
         activation->load_param(pd);
@@ -320,30 +317,25 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
     const int kernel_extent_w = dilation_w * (kernel_w - 1) + 1;
     const int kernel_extent_h = dilation_h * (kernel_h - 1) + 1;
 
+    // Mat m = bottom_blob;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const signed char *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
+
     Mat bottom_blob_unbordered = bottom_blob;
     if (elemsize != 1)
     {
-        bottom_blob_unbordered.create(w, h, channels, (size_t)1u, opt.workspace_allocator);
-        if (bottom_blob_unbordered.empty())
-            return -100;
-
-        const int channels_g = channels / group;
-
-// quantize, scale and round to nearest
-#pragma omp parallel for num_threads(opt.num_threads)
-        for (int g = 0; g < group; g++)
-        {
-            Option opt_g = opt;
-            opt_g.num_threads = 1;
-            opt_g.blob_allocator = bottom_blob_unbordered.allocator;
-            opt_g.use_int_internal = true;
-
-            const Mat bottom_blob_g = bottom_blob.channel_range(channels_g * g, channels_g);
-            Mat bottom_blob_int8_g = bottom_blob_unbordered.channel_range(channels_g * g, channels_g);
-
-            //quantize_float32_to_int8(bottom_blob_g, bottom_blob_int8_g, bottom_blob_int8_scales[g], opt_g);
-            quantize_int_to_int8(bottom_blob_g, bottom_blob_int8_g, bottom_blob_int8_scales[g], position_bottom_scale, position_scale_in, opt_g);
-        }
+        fprintf(stderr, "error, convdw input must be int8\n");
     }
 
     Mat bottom_blob_bordered = bottom_blob_unbordered;
@@ -385,7 +377,7 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
     int outh = (h - kernel_extent_h) / stride_h + 1;
 
     // int8
-    size_t out_elemsize = use_int8_requantize ? 1u : 4u;
+    size_t out_elemsize = 1u;
 
     top_blob.create(outw, outh, num_output, out_elemsize, opt.blob_allocator);
     if (top_blob.empty())
@@ -394,84 +386,34 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
     // depth-wise
     if (channels == group && group == num_output)
     {
-        if (use_int8_requantize)
+        std::vector<int> dequantize_scales;
+        dequantize_scales.resize(num_output + 1);
+        mat2vector(scales, dequantize_scales);
+        int right_shift = dequantize_scales[num_output];
+
+        if (kernel_w == 3 && kernel_h == 3 && stride_w == 1 && stride_h == 1 && dilation_w == 1 && dilation_h == 1)
         {
-            std::vector<float> requantize_scales;
-            for (int g = 0; g < group; g++)
+            // fprintf(stdout,"1\n");
+            convdw3x3s1_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, dequantize_scales, opt, right_shift);
+
+            if (activation)
             {
-                float scale_in;
-                if (weight_data_int8_scales[g] == 0)
-                    scale_in = 0;
-                else
-                    scale_in = 1.f / (bottom_blob_int8_scales[g] * weight_data_int8_scales[g]);
-
-                float scale_out = top_blob_int8_scale;
-
-                requantize_scales.push_back(scale_in);
-                requantize_scales.push_back(scale_out);
+                activation->forward_inplace(top_blob, opt);
             }
 
-            if (kernel_w == 3 && kernel_h == 3 && dilation_w == 1 && dilation_h == 1 && stride_w == 1 && stride_h == 1)
-            {
-                convdw3x3s1_int8_requant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, requantize_scales, opt);
-
-                if (activation)
-                {
-                    activation->forward_inplace(top_blob, opt);
-                }
-
-                return 0;
-            }
-            if (kernel_w == 3 && kernel_h == 3 && dilation_w == 1 && dilation_h == 1 && stride_w == 2 && stride_h == 2)
-            {
-                convdw3x3s2_int8_requant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, requantize_scales, opt);
-
-                if (activation)
-                {
-                    activation->forward_inplace(top_blob, opt);
-                }
-
-                return 0;
-            }
+            return 0;
         }
-        else
+        if (kernel_w == 3 && kernel_h == 3 && stride_w == 2 && stride_h == 2 && dilation_w == 1 && dilation_h == 1)
         {
-            std::vector<int> dequantize_scales;
-            const int *ptr = bottom_blob_int8_scales.channel(0);
-            const int *ptr_w = weight_data_int8_scales.channel(0);
-            for (int g = 0; g < group; g++)
+            // fprintf(stdout,"2\n");
+            convdw3x3s2_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, dequantize_scales, opt, right_shift);
+
+            if (activation)
             {
-
-                float top_rescale = 1.f / ptr[g];
-
-                int scale_in_int = int(top_rescale * pow(2, position_scale_in + position_bottom_scale + 3) / ptr_w[g]);
-                dequantize_scales.push_back(scale_in_int);
+                activation->forward_inplace(top_blob, opt);
             }
 
-            if (kernel_w == 3 && kernel_h == 3 && stride_w == 1 && stride_h == 1 && dilation_w == 1 && dilation_h == 1)
-            {
-                // fprintf(stdout,"1\n");
-                convdw3x3s1_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, dequantize_scales, opt);
-
-                if (activation)
-                {
-                    activation->forward_inplace(top_blob, opt);
-                }
-
-                return 0;
-            }
-            if (kernel_w == 3 && kernel_h == 3 && stride_w == 2 && stride_h == 2 && dilation_w == 1 && dilation_h == 1)
-            {
-                // fprintf(stdout,"2\n");
-                convdw3x3s2_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, bias_data, dequantize_scales, opt);
-
-                if (activation)
-                {
-                    activation->forward_inplace(top_blob, opt);
-                }
-
-                return 0;
-            }
+            return 0;
         }
     }
 

@@ -33,7 +33,7 @@ int BinaryOp::load_param(const ParamDict &pd)
     op_type = pd.get(0, 0);
     with_scalar = pd.get(1, 0);
     b = pd.get(2, 0.f);
-    use_int8_inference = pd.get(3, 0);
+    use_int8_inference = pd.get(8, 0);
 
     if (with_scalar != 0)
     {
@@ -408,6 +408,7 @@ static int binary_op(const Mat &a, const Mat &b, Mat &c, const Option &opt)
     return 0;
 } // namespace ncnn
 
+/*
 template <typename Op>
 static int binary_op_int(const Mat &a, const Mat &b, Mat &c, const Option &opt)
 {
@@ -768,6 +769,7 @@ static int binary_op_int(const Mat &a, const Mat &b, Mat &c, const Option &opt)
 
     return 0;
 } // namespace ncnn
+*/
 
 template <typename Op>
 static int binary_op_scalar_inplace(Mat &a, float b, const Option &opt)
@@ -792,6 +794,367 @@ static int binary_op_scalar_inplace(Mat &a, float b, const Option &opt)
 
     return 0;
 }
+
+template <typename Op>
+static int binary_op_signed_char(const Mat &a, const Mat &b, Mat &c, const Option &opt)
+{
+    Op op;
+
+    int w = a.w;
+    int h = a.h;
+    int channels = a.c;
+    int size = w * h;
+    size_t elemsize = a.elemsize;
+
+    int w1 = b.w;
+    int h1 = b.h;
+    int channels1 = b.c;
+    int size1 = w1 * h1;
+    if (a.dims == 3)
+    {
+        c.create(w, h, channels, elemsize, opt.blob_allocator);
+        if (c.empty())
+            return -100;
+
+        if (b.dims == 3)
+        {
+            if (w1 == 1 && h1 == 1 && channels1 == channels)
+            {
+// special type 1
+#pragma omp parallel for num_threads(opt.num_threads)
+                for (int q = 0; q < channels; q++)
+                {
+                    const signed char *ptr = a.channel(q);
+                    signed char *outptr = c.channel(q);
+                    const signed char *b0 = b.channel(q);
+                    for (int i = 0; i < size; i++)
+                    {
+                        outptr[i] = op(ptr[i], b0[0]);
+                    }
+                }
+
+                return 0;
+            }
+
+            if (w1 == w && h1 == h && channels1 == 1)
+            {
+// special type 2
+#pragma omp parallel for num_threads(opt.num_threads)
+                for (int q = 0; q < channels; q++)
+                {
+                    const signed char *ptr = a.channel(q);
+                    const signed char *ptr1 = b;
+                    signed char *outptr = c.channel(q);
+                    for (int i = 0; i < size; i++)
+                    {
+                        outptr[i] = op(ptr[i], ptr1[i]);
+                    }
+                }
+
+                return 0;
+            }
+
+// type 19
+#pragma omp parallel for num_threads(opt.num_threads)
+            for (int q = 0; q < channels; q++)
+            {
+                const signed char *ptr = a.channel(q);
+                const signed char *ptr1 = b.channel(q);
+                signed char *outptr = c.channel(q);
+
+                for (int i = 0; i < size; i++)
+                {
+                    outptr[i] = op(ptr[i], ptr1[i]);
+                }
+            }
+
+            return 0;
+        }
+
+        if (b.dims == 2)
+        {
+// type 18
+#pragma omp parallel for num_threads(opt.num_threads)
+            for (int q = 0; q < channels; q++)
+            {
+                const signed char *ptr = a.channel(q);
+                const signed char *ptr1 = b.row_signed_char(q);
+                signed char *outptr = c.channel(q);
+
+                for (int y = 0; y < h; y++)
+                {
+                    const signed char b0 = ptr1[y];
+                    for (int x = 0; x < w; x++)
+                    {
+                        outptr[x] = op(ptr[x], b0);
+                    }
+
+                    ptr += w;
+                    outptr += w;
+                }
+            }
+
+            return 0;
+        }
+
+        if (b.dims == 1)
+        {
+            if (b.w == 1)
+            {
+                // type 16
+                const signed char b0 = b[0];
+#pragma omp parallel for num_threads(opt.num_threads)
+                for (int q = 0; q < channels; q++)
+                {
+                    const signed char *ptr = a.channel(q);
+                    signed char *outptr = c.channel(q);
+
+                    for (int i = 0; i < size; i++)
+                    {
+                        outptr[i] = op(ptr[i], b0);
+                    }
+                }
+
+                return 0;
+            }
+
+// type 17
+#pragma omp parallel for num_threads(opt.num_threads)
+            for (int q = 0; q < channels; q++)
+            {
+                const signed char *ptr = a.channel(q);
+                const signed char b0 = b[q];
+                signed char *outptr = c.channel(q);
+
+                for (int i = 0; i < size; i++)
+                {
+                    outptr[i] = op(ptr[i], b0);
+                }
+            }
+
+            return 0;
+        }
+    }
+    else if (a.dims == 2)
+    {
+        if (b.dims == 3)
+        {
+            // type 14
+            c.create(w1, h1, channels1, elemsize, opt.blob_allocator);
+            if (c.empty())
+                return -100;
+
+#pragma omp parallel for num_threads(opt.num_threads)
+            for (int q = 0; q < channels1; q++)
+            {
+                const signed char *ptr = a.row_signed_char(q);
+                const signed char *ptr1 = b.channel(q);
+                signed char *outptr = c.channel(q);
+
+                for (int y = 0; y < h1; y++)
+                {
+                    const signed char a0 = ptr[y];
+                    for (int x = 0; x < w1; x++)
+                    {
+                        outptr[x] = op(a0, ptr1[x]);
+                    }
+
+                    ptr1 += w1;
+                    outptr += w1;
+                }
+            }
+
+            return 0;
+        }
+
+        c.create(w, h, elemsize, opt.blob_allocator);
+        if (c.empty())
+            return -100;
+
+        if (b.dims == 2)
+        {
+            // type 13
+            for (int i = 0; i < size; i++)
+            {
+                c[i] = op(a[i], b[i]);
+            }
+
+            return 0;
+        }
+
+        if (b.dims == 1)
+        {
+            c.create(w, h, elemsize, opt.blob_allocator);
+            if (c.empty())
+                return -100;
+
+            if (b.w == 1)
+            {
+                // type 11
+                const signed char b0 = b[0];
+                for (int i = 0; i < size; i++)
+                {
+                    c[i] = op(a[i], b0);
+                }
+
+                return 0;
+            }
+
+            // type 12
+            const signed char *ptr = a;
+            signed char *outptr = c;
+
+            for (int y = 0; y < h; y++)
+            {
+                const signed char b0 = b[y];
+                for (int x = 0; x < w; x++)
+                {
+                    outptr[x] = op(ptr[x], b0);
+                }
+
+                ptr += w;
+                outptr += w;
+            }
+
+            return 0;
+        }
+    }
+    else if (a.dims == 1)
+    {
+        if (a.w == 1)
+        {
+            if (b.dims == 3)
+            {
+                // type 4
+                c.create(w1, h1, channels1, elemsize, opt.blob_allocator);
+                if (c.empty())
+                    return -100;
+
+                const signed char a0 = a[0];
+#pragma omp parallel for num_threads(opt.num_threads)
+                for (int q = 0; q < channels1; q++)
+                {
+                    const signed char *ptr1 = b.channel(q);
+                    signed char *outptr = c.channel(q);
+
+                    for (int i = 0; i < size1; i++)
+                    {
+                        outptr[i] = op(a0, ptr1[i]);
+                    }
+                }
+
+                return 0;
+            }
+
+            if (b.dims == 2)
+            {
+                // type 3
+                c.create(w1, h1, elemsize, opt.blob_allocator);
+                if (c.empty())
+                    return -100;
+
+                const signed char a0 = a[0];
+                for (int i = 0; i < size1; i++)
+                {
+                    c[i] = op(a0, b[i]);
+                }
+
+                return 0;
+            }
+
+            if (b.dims == 1)
+            {
+                // type 2
+                c.create(w1, elemsize, opt.blob_allocator);
+                if (c.empty())
+                    return -100;
+
+                const signed char a0 = a[0];
+                for (int i = 0; i < w1; i++)
+                {
+                    c[i] = op(a0, b[i]);
+                }
+
+                return 0;
+            }
+        }
+
+        if (b.dims == 3)
+        {
+            // type 9
+            c.create(w1, h1, channels1, elemsize, opt.blob_allocator);
+            if (c.empty())
+                return -100;
+
+#pragma omp parallel for num_threads(opt.num_threads)
+            for (int q = 0; q < channels1; q++)
+            {
+                const signed char a0 = a[q];
+                const signed char *ptr1 = b.channel(q);
+                signed char *outptr = c.channel(q);
+
+                for (int i = 0; i < size1; i++)
+                {
+                    outptr[i] = op(a0, ptr1[i]);
+                }
+            }
+
+            return 0;
+        }
+
+        if (b.dims == 2)
+        {
+            // type 8
+            c.create(w1, h1, elemsize, opt.blob_allocator);
+            if (c.empty())
+                return -100;
+
+            const signed char *ptr1 = b;
+            signed char *outptr = c;
+
+            for (int y = 0; y < h1; y++)
+            {
+                const signed char a0 = a[y];
+                for (int x = 0; x < w1; x++)
+                {
+                    outptr[x] = op(a0, ptr1[x]);
+                }
+
+                ptr1 += w1;
+                outptr += w1;
+            }
+
+            return 0;
+        }
+
+        if (b.dims == 1)
+        {
+            c.create(w, elemsize, opt.blob_allocator);
+            if (c.empty())
+                return -100;
+
+            if (b.w == 1)
+            {
+                // type 6
+                const signed char b0 = b[0];
+                for (int i = 0; i < w; i++)
+                {
+                    c[i] = op(a[i], b0);
+                }
+
+                return 0;
+            }
+
+            // type 7
+            for (int i = 0; i < w; i++)
+            {
+                c[i] = op(a[i], b[i]);
+            }
+        }
+    }
+
+    return 0;
+} // namespace ncnn
 
 template <typename T>
 struct binary_op_max
@@ -896,6 +1259,7 @@ int BinaryOp::forward_inplace(Mat &bottom_top_blob, const Option &opt) const
     return 0;
 }
 
+/*
 int BinaryOp::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const
 {
     const Mat &bottom_blob = bottom_blobs[0];
@@ -929,6 +1293,60 @@ int BinaryOp::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat
 
     if (op_type == Operation_RDIV)
         return binary_op_int<binary_op_rdiv<int>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    return 0;
+}
+*/
+
+int BinaryOp::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const
+{
+    const Mat &bottom_blob = bottom_blobs[0];
+    const Mat &bottom_blob1 = bottom_blobs[1];
+
+    // fprintf(stdout, "gggggggggggggggg\n");
+    // const Mat s = bottom_blob;
+    // for (int c = 0; c < s.c; c++)
+    // {
+    //     const signed char *ptr = s.channel(c);
+    //     for (int h = 0; h < s.h; h++)
+    //     {
+    //         for (int w = 0; w < s.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += s.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
+
+    Mat &top_blob = top_blobs[0];
+
+    if (op_type == Operation_ADD)
+        return binary_op_signed_char<std::plus<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_SUB)
+        return binary_op_signed_char<std::minus<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_MUL)
+        return binary_op_signed_char<std::multiplies<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_DIV)
+        return binary_op_signed_char<std::divides<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_MAX)
+        return binary_op_signed_char<binary_op_max<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_MIN)
+        return binary_op_signed_char<binary_op_min<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_POW)
+        return binary_op_signed_char<binary_op_pow<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_RSUB)
+        return binary_op_signed_char<binary_op_rsub<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
+
+    if (op_type == Operation_RDIV)
+        return binary_op_signed_char<binary_op_rdiv<signed char>>(bottom_blob, bottom_blob1, top_blob, opt);
 
     return 0;
 }

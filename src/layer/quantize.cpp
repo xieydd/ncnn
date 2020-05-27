@@ -30,7 +30,7 @@ Quantize::Quantize()
 int Quantize::load_param(const ParamDict &pd)
 {
     // TODO change scale to get(0,1.f) and quantize.h scale to float
-    scale = pd.get(0, 1);
+    scale = pd.get(0, 1.f);
     position_bottom_scale = pd.get(1, 5);
     position_scale_in = pd.get(2, 18);
 

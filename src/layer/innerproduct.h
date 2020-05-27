@@ -51,10 +51,12 @@ public:
     Mat weight_data;
     Mat bias_data;
 
+    // TODO Delete
     Mat weight_data_int8_scales;
     int bottom_blob_int8_scale;
-    int position_scale_in = 18;
-    int position_bottom_scale = 5;
+    // TODO
+
+    Mat scales;
 };
 
 } // namespace ncnn

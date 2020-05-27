@@ -35,6 +35,7 @@ public:
     float min;
     float max;
     int use_int8_inference;
+    Mat scales;
 };
 
 } // namespace ncnn

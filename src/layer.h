@@ -31,7 +31,49 @@
 #include "pipeline.h"
 #endif // NCNN_VULKAN
 
-namespace ncnn {
+static inline void mat2vector(const ncnn::Mat &m, std::vector<int> &v)
+{
+    int i = 0;
+    unsigned int len = v.size();
+    for (int c = 0; c < m.c; c++)
+    {
+        const int *ptr = m.channel(c);
+        for (int h = 0; h < m.h; h++)
+        {
+            for (int w = 0; w < m.w; w++)
+            {
+                if (i >= len)
+                {
+                    fprintf(stdout, "error in mat2vector\n");
+                    fflush(stdout);
+                }
+                v[i] = ptr[w];
+                i++;
+            }
+            ptr += m.w;
+        }
+    }
+}
+
+static inline void mat2vector_signed_char(const ncnn::Mat &m, std::vector<signed char> &v)
+{
+    int i = 0;
+    for (int c = 0; c < m.c; c++)
+    {
+        const signed char *ptr = m.channel(c);
+        for (int h = 0; h < m.h; h++)
+        {
+            for (int w = 0; w < m.w; w++)
+            {
+                v[i] = ptr[w];
+                i++;
+            }
+            ptr += m.w;
+        }
+    }
+}
+namespace ncnn
+{
 
 class Layer
 {
@@ -43,19 +85,19 @@ public:
 
     // load layer specific parameter from parsed dict
     // return 0 if success
-    virtual int load_param(const ParamDict& pd);
+    virtual int load_param(const ParamDict &pd);
 
     // load layer specific weight data from model binary
     // return 0 if success
-    virtual int load_model(const ModelBin& mb);
+    virtual int load_model(const ModelBin &mb);
 
     // layer implementation specific setup
     // return 0 if success
-    virtual int create_pipeline(const Option& opt);
+    virtual int create_pipeline(const Option &opt);
 
     // layer implementation specific clean
     // return 0 if success
-    virtual int destroy_pipeline(const Option& opt);
+    virtual int destroy_pipeline(const Option &opt);
 
 public:
     // one input and one output blob
@@ -73,33 +115,33 @@ public:
 public:
     // implement inference
     // return 0 if success
-    virtual int forward(const std::vector<Mat>& bottom_blobs, std::vector<Mat>& top_blobs, const Option& opt) const;
-    virtual int forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    virtual int forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const;
+    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
     // implement inplace inference
     // return 0 if success
-    virtual int forward_inplace(std::vector<Mat>& bottom_top_blobs, const Option& opt) const;
-    virtual int forward_inplace(Mat& bottom_top_blob, const Option& opt) const;
+    virtual int forward_inplace(std::vector<Mat> &bottom_top_blobs, const Option &opt) const;
+    virtual int forward_inplace(Mat &bottom_top_blob, const Option &opt) const;
 
 #if NCNN_VULKAN
 public:
     // upload weight blob from host to device
-    virtual int upload_model(VkTransfer& cmd, const Option& opt);
+    virtual int upload_model(VkTransfer &cmd, const Option &opt);
 
 public:
     // implement inference
     // return 0 if success
-    virtual int forward(const std::vector<VkMat>& bottom_blobs, std::vector<VkMat>& top_blobs, VkCompute& cmd, const Option& opt) const;
-    virtual int forward(const VkMat& bottom_blob, VkMat& top_blob, VkCompute& cmd, const Option& opt) const;
+    virtual int forward(const std::vector<VkMat> &bottom_blobs, std::vector<VkMat> &top_blobs, VkCompute &cmd, const Option &opt) const;
+    virtual int forward(const VkMat &bottom_blob, VkMat &top_blob, VkCompute &cmd, const Option &opt) const;
 
     // implement inplace inference
     // return 0 if success
-    virtual int forward_inplace(std::vector<VkMat>& bottom_top_blobs, VkCompute& cmd, const Option& opt) const;
-    virtual int forward_inplace(VkMat& bottom_top_blob, VkCompute& cmd, const Option& opt) const;
+    virtual int forward_inplace(std::vector<VkMat> &bottom_top_blobs, VkCompute &cmd, const Option &opt) const;
+    virtual int forward_inplace(VkMat &bottom_top_blob, VkCompute &cmd, const Option &opt) const;
 
 public:
     // assigned immediately after creating this layer
-    const VulkanDevice* vkdev;
+    const VulkanDevice *vkdev;
 #endif // NCNN_VULKAN
 
 public:
@@ -121,13 +163,13 @@ public:
 };
 
 // layer factory function
-typedef Layer* (*layer_creator_func)();
+typedef Layer *(*layer_creator_func)();
 
 struct layer_registry_entry
 {
 #if NCNN_STRING
     // layer type name
-    const char* name;
+    const char *name;
 #endif // NCNN_STRING
     // layer factory entry
     layer_creator_func creator;
@@ -135,15 +177,15 @@ struct layer_registry_entry
 
 #if NCNN_STRING
 // get layer type from type name
-int layer_to_index(const char* type);
+int layer_to_index(const char *type);
 // create layer from type name
-Layer* create_layer(const char* type);
+Layer *create_layer(const char *type);
 #endif // NCNN_STRING
 // create layer from layer type
-Layer* create_layer(int index);
+Layer *create_layer(int index);
 
 #define DEFINE_LAYER_CREATOR(name) \
-    ::ncnn::Layer* name##_layer_creator() { return new name; }
+    ::ncnn::Layer *name##_layer_creator() { return new name; }
 
 } // namespace ncnn
 

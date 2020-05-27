@@ -16,6 +16,15 @@
 #include <algorithm>
 #include "layer_type.h"
 
+static inline signed char float2int8(float f)
+{
+    int int32 = round(f);
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
+    return (signed char)int32;
+}
 namespace ncnn
 {
 
@@ -54,10 +63,7 @@ int InnerProduct::load_model(const ModelBin &mb)
 
     if (int8_scale_term)
     {
-        weight_data_int8_scales = mb.load(num_output, 1);
-        Mat bottom_blob_int8_scales = mb.load(1, 1);
-        const int *ptr = bottom_blob_int8_scales.channel(0);
-        bottom_blob_int8_scale = ptr[0];
+        scales = mb.load(num_output + 1, 1);
     }
 
     return 0;
@@ -152,6 +158,7 @@ int InnerProduct::forward(const Mat &bottom_blob, Mat &top_blob, const Option &o
         }
 
         top_blob[p] = sum;
+        // fprintf(stdout, "%f \n", top_blob[p]);
     }
 
     return 0;
@@ -168,15 +175,31 @@ int InnerProduct::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Opti
     Mat bottom_blob_tm = bottom_blob;
     if (elemsize != 1)
     {
-        Option opt_g = opt;
-        opt_g.blob_allocator = opt.workspace_allocator;
-        opt_g.use_int_internal = true;
-        quantize_int_to_int8(bottom_blob, bottom_blob_tm, bottom_blob_int8_scale, position_bottom_scale, position_scale_in, opt_g);
+        fprintf(stderr, "error, conv input must be int8\n");
     }
+    // Mat m = bottom_blob;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const signed char *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
 
-    top_blob.create(num_output, elemsize, opt.blob_allocator);
+    top_blob.create(num_output, 4u, opt.blob_allocator);
     if (top_blob.empty())
         return -100;
+
+    std::vector<int> scales_dequant;
+    scales_dequant.resize(num_output + 1);
+    mat2vector(scales, scales_dequant);
+    int right_shift = scales_dequant[num_output];
 
 // num_output
 #pragma omp parallel for num_threads(opt.num_threads)
@@ -199,14 +222,8 @@ int InnerProduct::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Opti
         }
 
         // dequantize and relu
-        float scale_in;
-        const int *ptr_w = weight_data_int8_scales.channel(0);
-        if (ptr_w[p] == 0)
-            scale_in = 0;
-        else
-            scale_in = 1.f / bottom_blob_int8_scale;
-        int scale_out = int(scale_in * pow(2, position_bottom_scale + position_scale_in + 3) / ptr_w[p]);
         int32_t sum_int32 = sum;
+        // fprintf(stdout, "kkk %d \n", sum_int32);
         if (bias_term)
         {
             const int32_t *bias = bias_data.channel(0);
@@ -217,8 +234,9 @@ int InnerProduct::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Opti
         {
             sum_int32 = std::max(sum_int32, 0);
         }
-
-        outptr[p] = 1.0f * sum_int32 * scale_out / pow(2, position_scale_in);
+        //outptr[p] = right_shift < 0 ? (sum_int32 * scales_dequant[p]) >> (-right_shift) : (sum_int32 * scales_dequant[p]) << (right_shift);
+        outptr[p] = right_shift < 0 ? (sum_int32 * scales_dequant[p]) / pow(2, (-right_shift)) : (sum_int32 * scales_dequant[p]) * pow(2, right_shift);
+        // fprintf(stdout, "kkk %f \n", outptr[p]);
     }
 
     return 0;

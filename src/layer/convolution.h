@@ -64,10 +64,15 @@ public:
     Mat weight_data;
     Mat bias_data;
 
+    // TODO Delete
     Mat weight_data_int8_scales;
     int bottom_blob_int8_scale;
     float top_blob_int8_scale; // TODO load param
+    // TODO
 
+    Mat scales;
+    Mat top_scales;
+    int top_scale_nums;
     bool use_int8_requantize;
 
     // implementation type, 0 means do not use auto pack model

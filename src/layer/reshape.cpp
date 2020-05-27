@@ -30,7 +30,7 @@ int Reshape::load_param(const ParamDict &pd)
     w = pd.get(0, -233);
     h = pd.get(1, -233);
     c = pd.get(2, -233);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
     permute = pd.get(3, 0);
 
     ndim = 3;
@@ -156,14 +156,14 @@ int Reshape::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
                 return -100;
 
             // c-h-w to h-w-c
-            int *ptr = top_blob;
+            signed char *ptr = top_blob;
             for (int i = 0; i < bottom_blob.h; i++)
             {
                 for (int j = 0; j < bottom_blob.w; j++)
                 {
                     for (int p = 0; p < bottom_blob.c; p++)
                     {
-                        const int *bptr = bottom_blob.channel(p);
+                        const signed char *bptr = bottom_blob.channel(p);
                         *ptr++ = bptr[i * bottom_blob.w + j];
                     }
                 }

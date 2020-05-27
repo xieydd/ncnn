@@ -22,6 +22,15 @@ static inline signed char float2int8(float v)
     return (signed char)int32;
 }
 
+static inline signed char int2int8(int int32)
+{
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
+    return (signed char)int32;
+}
+
 static void conv_im2col_sgemm_int8_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel,
                                        const int kernel_w, const int kernel_h, const int stride_w, const int stride_h, const Option &opt)
 {
@@ -459,7 +468,7 @@ static void conv_im2col_sgemm_int8_sse(const Mat &bottom_blob, Mat &top_blob, co
 
 static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel,
                                                //const int kernel_w, const int kernel_h, const int stride_w, const int stride_h, const Mat &_bias, std::vector<float> scale_dequant, const Option &opt)
-                                               const int kernel_w, const int kernel_h, const int stride_w, const int stride_h, const Mat &_bias, std::vector<int> scale_dequant, const Option &opt)
+                                               const int kernel_w, const int kernel_h, const int stride_w, const int stride_h, const Mat &_bias, std::vector<int> scale_dequant, const Option &opt, int right_shift)
 {
     int w = bottom_blob.w;
     int inch = bottom_blob.c;
@@ -470,6 +479,8 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
 
     const signed char *kernel = _kernel;
     const int32_t *bias = _bias;
+    // fprintf(stdout, "xxxxx\n");
+    // fflush(stdout);
 
     // im2row
     Mat bottom_im2row(kernel_h * kernel_w * inch, outw * outh, 1UL, opt.workspace_allocator);
@@ -499,6 +510,8 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
             }
         }
     }
+    // fprintf(stdout, "xxxxx22\n");
+    // fflush(stdout);
 
     int kernel_size = kernel_w * kernel_h;
     int out_size = outw * outh;
@@ -709,10 +722,10 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
             // float *output2 = top_blob.channel(i + 2);
             // float *output3 = top_blob.channel(i + 3);
 
-            int *output0 = top_blob.channel(i);
-            int *output1 = top_blob.channel(i + 1);
-            int *output2 = top_blob.channel(i + 2);
-            int *output3 = top_blob.channel(i + 3);
+            signed char *output0 = top_blob.channel(i);
+            signed char *output1 = top_blob.channel(i + 1);
+            signed char *output2 = top_blob.channel(i + 2);
+            signed char *output3 = top_blob.channel(i + 3);
 
             int j = 0;
             for (; j + 3 < N; j = j + 4)
@@ -768,10 +781,14 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
                     // output1[n] = (float)sum1[n] * scale_dequant1 + bias1;
                     // output2[n] = (float)sum2[n] * scale_dequant2 + bias2;
                     // output3[n] = (float)sum3[n] * scale_dequant3 + bias3;
-                    output0[n] = (sum0[n] + bias0) * scale_dequant0;
-                    output1[n] = (sum1[n] + bias1) * scale_dequant1;
-                    output2[n] = (sum2[n] + bias2) * scale_dequant2;
-                    output3[n] = (sum3[n] + bias3) * scale_dequant3;
+                    // output0[n] = right_shift < 0 ? float2int8(float(((sum0[n] + bias0) * scale_dequant0) >> (-right_shift))) : float2int8(float(((sum0[n] + bias0) * scale_dequant0) << right_shift));
+                    // output1[n] = right_shift < 0 ? float2int8(float(((sum1[n] + bias1) * scale_dequant1) >> (-right_shift))) : float2int8(float(((sum1[n] + bias1) * scale_dequant1) << right_shift));
+                    // output2[n] = right_shift < 0 ? float2int8(float(((sum2[n] + bias2) * scale_dequant2) >> (-right_shift))) : float2int8(float(((sum2[n] + bias2) * scale_dequant2) << right_shift));
+                    // output3[n] = right_shift < 0 ? float2int8(float(((sum3[n] + bias3) * scale_dequant3) >> (-right_shift))) : float2int8(float(((sum3[n] + bias3) * scale_dequant3) << right_shift));
+                    output0[n] = right_shift < 0 ? int2int8(((sum0[n] + bias0) * scale_dequant0) >> (-right_shift)) : int2int8(((sum0[n] + bias0) * scale_dequant0) << (right_shift));
+                    output1[n] = right_shift < 0 ? int2int8(((sum1[n] + bias1) * scale_dequant1) >> (-right_shift)) : int2int8(((sum1[n] + bias1) * scale_dequant1) << (right_shift));
+                    output2[n] = right_shift < 0 ? int2int8(((sum2[n] + bias2) * scale_dequant2) >> (-right_shift)) : int2int8(((sum2[n] + bias2) * scale_dequant2) << (right_shift));
+                    output3[n] = right_shift < 0 ? int2int8(((sum3[n] + bias3) * scale_dequant3) >> (-right_shift)) : int2int8(((sum3[n] + bias3) * scale_dequant3) << (right_shift));
                 }
                 output0 += 4;
                 output1 += 4;
@@ -824,11 +841,14 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
                 // output1[0] = (float)sum1 * scale_dequant1 + bias1;
                 // output2[0] = (float)sum2 * scale_dequant2 + bias2;
                 // output3[0] = (float)sum3 * scale_dequant3 + bias3;
-
-                output0[0] = (sum0 + bias0) * scale_dequant0;
-                output1[0] = (sum1 + bias1) * scale_dequant1;
-                output2[0] = (sum2 + bias2) * scale_dequant2;
-                output3[0] = (sum3 + bias3) * scale_dequant3;
+                // output0[0] = right_shift < 0 ? float2int8(float(((sum0 + bias0) * scale_dequant0) >> (-right_shift))) : float2int8(float(((sum0 + bias0) * scale_dequant0) << right_shift));
+                // output1[0] = right_shift < 0 ? float2int8(float(((sum1 + bias1) * scale_dequant1) >> (-right_shift))) : float2int8(float(((sum1 + bias1) * scale_dequant1) << right_shift));
+                // output2[0] = right_shift < 0 ? float2int8(float(((sum2 + bias2) * scale_dequant2) >> (-right_shift))) : float2int8(float(((sum2 + bias2) * scale_dequant2) << right_shift));
+                // output3[0] = right_shift < 0 ? float2int8(float(((sum3 + bias3) * scale_dequant3) >> (-right_shift))) : float2int8(float(((sum3 + bias3) * scale_dequant3) << right_shift));
+                output0[0] = right_shift < 0 ? int2int8(((sum0 + bias0) * scale_dequant0) >> (-right_shift)) : int2int8(((sum0 + bias0) * scale_dequant0) << (right_shift));
+                output1[0] = right_shift < 0 ? int2int8(((sum1 + bias1) * scale_dequant1) >> (-right_shift)) : int2int8(((sum1 + bias1) * scale_dequant1) << (right_shift));
+                output2[0] = right_shift < 0 ? int2int8(((sum2 + bias2) * scale_dequant2) >> (-right_shift)) : int2int8(((sum2 + bias2) * scale_dequant2) << (right_shift));
+                output3[0] = right_shift < 0 ? int2int8(((sum3 + bias3) * scale_dequant3) >> (-right_shift)) : int2int8(((sum3 + bias3) * scale_dequant3) << (right_shift));
 
                 output0++;
                 output1++;
@@ -837,10 +857,12 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
             }
         }
 
+        // fprintf(stdout, "xxxxx55\n");
+        // fflush(stdout);
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int i = remain_outch_start; i < outch; i++)
         {
-            int *output = top_blob.channel(i);
+            signed char *output = top_blob.channel(i);
 
             const int32_t bias0 = bias ? bias[i] : 0;
             // const float scale_dequant0 = scale_dequant[i];
@@ -877,7 +899,8 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
 
                 for (int n = 0; n < 4; n++)
                 {
-                    output[n] = (sum[n] + bias0) * scale_dequant0;
+                    output[n] = right_shift < 0 ? int2int8(((sum[n] + bias0) * scale_dequant0) >> (-right_shift)) : int2int8(((sum[n] + bias0) * scale_dequant0) << (right_shift));
+                    // output[n] = right_shift < 0 ? float2int8(float(((sum[n] + bias0) * scale_dequant0) >> (-right_shift))) : float2int8(float(((sum[n] + bias0) * scale_dequant0) << right_shift));
                 }
                 output += 4;
             }
@@ -896,8 +919,8 @@ static void conv_im2col_sgemm_int8_dequant_sse(const Mat &bottom_blob, Mat &top_
                     va += 1;
                     vb += 1;
                 }
-                output[0] = (sum + bias0) * scale_dequant0;
-
+                output[0] = right_shift < 0 ? int2int8(((sum + bias0) * scale_dequant0) >> (-right_shift)) : int2int8(((sum + bias0) * scale_dequant0) << (right_shift));
+                // output[0] = right_shift < 0 ? float2int8(float(((sum + bias0) * scale_dequant0) >> (-right_shift))) : float2int8(float(((sum + bias0) * scale_dequant0) << right_shift));
                 output++;
             }
         }

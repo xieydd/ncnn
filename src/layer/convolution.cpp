@@ -49,6 +49,7 @@ int Convolution::load_param(const ParamDict &pd)
     activation_type = pd.get(9, 0);
     activation_params = pd.get(10, Mat());
     impl_type = pd.get(17, 0);
+    top_scale_nums = pd.get(18, 0);
 
     return 0;
 }
@@ -68,10 +69,8 @@ int Convolution::load_model(const ModelBin &mb)
 
     if (int8_scale_term)
     {
-        weight_data_int8_scales = mb.load(num_output, 1);
-        Mat bottom_blob_int8_scales = mb.load(1, 1);
-        const int *ptr = bottom_blob_int8_scales.channel(0);
-        bottom_blob_int8_scale = ptr[0];
+        scales = mb.load(num_output + 1, 1);
+        top_scales = mb.load(top_scale_nums, 1);
     }
 
     return 0;

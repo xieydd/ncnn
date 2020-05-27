@@ -28,7 +28,7 @@ Permute::Permute()
 int Permute::load_param(const ParamDict &pd)
 {
     order_type = pd.get(0, 0);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
 
     return 0;
 }
@@ -227,8 +227,8 @@ int Permute::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
             if (top_blob.empty())
                 return -100;
 
-            const int *ptr = bottom_blob;
-            int *outptr = top_blob;
+            const signed char *ptr = bottom_blob;
+            signed char *outptr = top_blob;
 
             for (int i = 0; i < w; i++)
             {
@@ -263,8 +263,8 @@ int Permute::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int q = 0; q < channels; q++)
         {
-            const int *ptr = bottom_blob.channel(q);
-            int *outptr = top_blob.channel(q);
+            const signed char *ptr = bottom_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (int i = 0; i < w; i++)
             {
@@ -284,11 +284,11 @@ int Permute::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int q = 0; q < h; q++)
         {
-            int *outptr = top_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (int i = 0; i < channels; i++)
             {
-                const int *ptr = bottom_blob.channel(i).row_int(q);
+                const signed char *ptr = bottom_blob.channel(i).row_signed_char(q);
 
                 for (int j = 0; j < w; j++)
                 {
@@ -306,13 +306,13 @@ int Permute::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int q = 0; q < h; q++)
         {
-            int *outptr = top_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (int i = 0; i < w; i++)
             {
                 for (int j = 0; j < channels; j++)
                 {
-                    const int *ptr = bottom_blob.channel(j).row_int(q);
+                    const signed char *ptr = bottom_blob.channel(j).row_signed_char(q);
 
                     outptr[i * channels + j] = ptr[i];
                 }
@@ -328,11 +328,11 @@ int Permute::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int q = 0; q < w; q++)
         {
-            int *outptr = top_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (int i = 0; i < channels; i++)
             {
-                const int *ptr = bottom_blob.channel(i);
+                const signed char *ptr = bottom_blob.channel(i);
 
                 for (int j = 0; j < h; j++)
                 {
@@ -350,13 +350,13 @@ int Permute::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
         for (int q = 0; q < w; q++)
         {
-            int *outptr = top_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (int i = 0; i < h; i++)
             {
                 for (int j = 0; j < channels; j++)
                 {
-                    const int *ptr = bottom_blob.channel(j);
+                    const signed char *ptr = bottom_blob.channel(j);
 
                     outptr[i * channels + j] = ptr[i * w + q];
                 }

@@ -131,7 +131,9 @@ public:
     float *row(int y);
     const float *row(int y) const;
     int *row_int(int y);
+    signed char *row_signed_char(int y);
     const int *row_int(int y) const;
+    const signed char *row_signed_char(int y) const;
     template <typename T>
     T *row(int y);
     template <typename T>
@@ -759,6 +761,18 @@ inline void Mat::fill(int _v)
     }
 }
 
+// inline void Mat::fill(signed char _v)
+// {
+//     int size = (int)total();
+//     signed char *ptr = (signed char *)data;
+
+//     int remain = size;
+//     for (; remain > 0; remain--)
+//     {
+//         *ptr++ = _v;
+//     }
+// }
+
 #if __ARM_NEON
 inline void Mat::fill(float32x4_t _v)
 {
@@ -1195,6 +1209,16 @@ inline int *Mat::row_int(int y)
 inline const int *Mat::row_int(int y) const
 {
     return (const int *)((unsigned char *)data + w * y * elemsize);
+}
+
+inline signed char *Mat::row_signed_char(int y)
+{
+    return (signed char *)((unsigned char *)data + w * y * elemsize);
+}
+
+inline const signed char *Mat::row_signed_char(int y) const
+{
+    return (const signed char *)((unsigned char *)data + w * y * elemsize);
 }
 
 template <typename T>

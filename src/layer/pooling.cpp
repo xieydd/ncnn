@@ -42,7 +42,7 @@ int Pooling::load_param(const ParamDict &pd)
     global_pooling = pd.get(4, 0);
     pad_mode = pd.get(5, 0);
     avgpool_count_include_pad = pd.get(6, 0);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
 
     return 0;
 }
@@ -338,9 +338,9 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
             for (int q = 0; q < channels; q++)
             {
-                const int *ptr = bottom_blob.channel(q);
+                const signed char *ptr = bottom_blob.channel(q);
 
-                int max = ptr[0];
+                signed char max = ptr[0];
                 for (int i = 0; i < size; i++)
                 {
                     max = std::max(max, ptr[i]);
@@ -354,7 +354,7 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
             for (int q = 0; q < channels; q++)
             {
-                const int *ptr = bottom_blob.channel(q);
+                const signed char *ptr = bottom_blob.channel(q);
 
                 int sum = 0;
                 for (int i = 0; i < size; i++)
@@ -362,7 +362,7 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
                     sum += ptr[i];
                 }
 
-                top_blob[q] = static_cast<int>(round(1.0 * sum / size));
+                top_blob[q] = static_cast<signed char>(round(1.0 * sum / size));
             }
         }
 
@@ -470,19 +470,19 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
         for (int q = 0; q < channels; q++)
         {
             const Mat m = bottom_blob_bordered.channel(q);
-            int *outptr = top_blob.channel(q);
+            signed char *outptr = top_blob.channel(q);
 
             for (int i = 0; i < outh; i++)
             {
                 for (int j = 0; j < outw; j++)
                 {
-                    const int *sptr = m.row_int(i * stride_h) + j * stride_w;
+                    const signed char *sptr = m.row_signed_char(i * stride_h) + j * stride_w;
 
-                    int max = sptr[0];
+                    signed char max = sptr[0];
 
                     for (int k = 0; k < maxk; k++)
                     {
-                        int val = sptr[space_ofs[k]];
+                        signed char val = sptr[space_ofs[k]];
                         max = std::max(max, val);
                     }
 
@@ -501,7 +501,7 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
             for (int q = 0; q < channels; q++)
             {
                 const Mat m = bottom_blob_bordered.channel(q);
-                int *outptr = top_blob.channel(q);
+                signed char *outptr = top_blob.channel(q);
 
                 for (int i = 0; i < outh; i++)
                 {
@@ -534,13 +534,13 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
                                 if (sx >= w - pad_right - wtailpad)
                                     break;
 
-                                int val = m.row_int(sy)[sx];
+                                signed char val = m.row_signed_char(sy)[sx];
                                 sum += val;
                                 area += 1;
                             }
                         }
 
-                        outptr[j] = static_cast<int>(round(1.0 * sum / area));
+                        outptr[j] = static_cast<signed char>(round(1.0 * sum / area));
                     }
 
                     outptr += outw;
@@ -553,23 +553,23 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
             for (int q = 0; q < channels; q++)
             {
                 const Mat m = bottom_blob_bordered.channel(q);
-                int *outptr = top_blob.channel(q);
+                signed char *outptr = top_blob.channel(q);
 
                 for (int i = 0; i < outh; i++)
                 {
                     for (int j = 0; j < outw; j++)
                     {
-                        const int *sptr = m.row_int(i * stride_h) + j * stride_w;
+                        const signed char *sptr = m.row_signed_char(i * stride_h) + j * stride_w;
 
                         int sum = 0;
 
                         for (int k = 0; k < maxk; k++)
                         {
-                            float val = sptr[space_ofs[k]];
+                            signed char val = sptr[space_ofs[k]];
                             sum += val;
                         }
 
-                        outptr[j] = static_cast<int>(round(1.0 * sum / maxk));
+                        outptr[j] = static_cast<signed char>(round(1.0 * sum / maxk));
                     }
 
                     outptr += outw;

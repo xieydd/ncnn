@@ -27,7 +27,7 @@ Flatten::Flatten()
 
 int Flatten::load_param(const ParamDict &pd)
 {
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
 
     return 0;
 }
@@ -78,8 +78,8 @@ int Flatten::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 #pragma omp parallel for num_threads(opt.num_threads)
     for (int q = 0; q < channels; q++)
     {
-        const int *ptr = bottom_blob.channel(q);
-        int *outptr = (int *)top_blob + size * q;
+        const signed char *ptr = bottom_blob.channel(q);
+        signed char *outptr = (signed char *)top_blob + size * q;
 
         for (int i = 0; i < size; i++)
         {

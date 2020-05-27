@@ -27,15 +27,20 @@ public:
 
     virtual int load_param(const ParamDict &pd);
 
-    virtual int forward_inplace(Mat &bottom_top_blob, const Option &opt) const;
+    // virtual int forward_inplace(Mat &bottom_top_blob, const Option &opt) const;
 
     virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+    virtual int forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+
+    virtual int load_model(const ModelBin &mb);
 
 public:
     int w;
     int h;
     int c;
-    int position_scale_in = 19;
+    int use_int8_inference;
+    int scale;
+    int right_shift;
 };
 
 } // namespace ncnn

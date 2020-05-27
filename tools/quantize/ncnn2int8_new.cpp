@@ -21,6 +21,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include "math.h"
 
 // ncnn public header
 #include "net.h"
@@ -148,6 +149,31 @@ static bool read_int8scale_table(const char *filepath, std::map<std::string, std
     return true;
 }
 
+static inline int vector_float2int(int *dst, float *src, int len, int BitN)
+{
+    float src_max = (src[0] >= 0) ? src[0] : (0 - src[0]);
+    int i = 0;
+    int Bint, Bfrac;
+    float accuracy = 1.0;
+    for (i = 1; i < len; i++)
+    {
+        float tmp = (src[i] >= 0) ? src[i] : (0 - src[i]);
+        if (src_max < tmp)
+        {
+            src_max = tmp;
+        }
+    }
+
+    Bint = (int)(log2(src_max));
+    Bfrac = BitN - Bint;
+    accuracy = pow((float)2.0, (float)(0 - Bfrac));
+    for (i = 0; i < len; i++)
+    {
+        dst[i] = int(src[i] / accuracy + 0.5);
+    }
+    return (0 - Bfrac);
+}
+
 class NetQuantize : public ncnn::Net
 {
 public:
@@ -157,6 +183,11 @@ public:
     std::map<std::string, std::vector<float>> weight_int8scale_table;
     std::map<std::string, std::vector<signed char>> layers_scale;
     std::map<std::string, std::vector<float>> top_blob_int8scale_table;
+    std::map<std::string, std::vector<float>> result_blob_int8scale_table;
+    std::map<std::string, std::vector<int>> int_result_blob_int8scale_table;
+    // std::map<std::string, int> top_scale_right_shift;
+    std::map<std::string, std::vector<int>> int_top_blob_int8scale_table;
+    std::map<std::string, std::vector<int>> split_factor_table;
 
 public:
     int quantize_convolution();
@@ -166,6 +197,8 @@ public:
     std::string find_first_conv(std::string name);
     std::string find_first_shufflechannel(std::string name);
     void fill_scale_shufflechannel(std::vector<float> &layer_scale, int expected_layer_size, std::vector<int> status, std::set<int> &visited, std::string layer_name, bool left);
+    void split_scale(std::string name, std::vector<float> top_scales);
+    std::string find_first_split(std::string name);
 
 public:
     int fprintf_param_int_array(int id, const ncnn::Mat &m, FILE *pp);
@@ -183,6 +216,26 @@ int NetQuantize::find_top_scale()
     for (int i = 0; i < layer_count; i++)
     {
         ncnn::Layer *layer = layers[i];
+        if (layer->type == "Input")
+        {
+            std::string layer_name = layer->name;
+            for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
+            {
+                int layer_next_index = blobs[layer->tops[0]].consumers[n];
+                ncnn::Layer *layer_next = layers[layer_next_index];
+                if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise")
+                {
+                    top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[layer_next->name][0]);
+                }
+            }
+        }
+
+        if (i == layer_count - 1 && layer->type == "InnerProduct")
+        {
+            std::string layer_name = layer->name;
+            top_blob_int8scale_table[layer_name].push_back(1.0);
+        }
+
         if (layer->type == "Convolution" || layer->type == "ConvolutionDepthWise")
         {
             std::string layer_name = layer->name;
@@ -228,6 +281,7 @@ int NetQuantize::find_top_scale()
                             {
                                 layer_next_2_name_0 = layers[blobs[layer_next->tops[0]].consumers[0]]->name;
                                 layer_next_2_name_1 = layers[blobs[layer_next->tops[1]].consumers[0]]->name;
+                                condition2 = true;
                             }
                             else if ((layers[blobs[layer_next->tops[1]].consumers[0]]->type == "Convolution" ||
                                       layers[blobs[layer_next->tops[1]].consumers[0]]->type == "ConvolutionDepthWise") &&
@@ -235,9 +289,8 @@ int NetQuantize::find_top_scale()
                             {
                                 layer_next_2_name_0 = layers[blobs[layer_next->tops[1]].consumers[0]]->name;
                                 layer_next_2_name_1 = layers[blobs[layer_next->tops[0]].consumers[0]]->name;
+                                condition2 = true;
                             }
-
-                            condition2 = true;
                         }
                     }
 
@@ -251,9 +304,18 @@ int NetQuantize::find_top_scale()
                     // condition 2
                     else if (condition2)
                     {
+                        // if (layer->name == "379" || layer->name == "383") //TODO
+                        // {
+                        //     std::string first_conv_name = find_first_conv(layer_next_2_name_1);
+                        //     top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[layer_next_2_name_0][0]);
+                        //     top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[first_conv_name][0]);
+                        // }
+                        // else
+                        // {
                         top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[layer_next_2_name_0][0]);
                         std::string first_conv_name = find_first_conv(layer_next_2_name_1);
                         top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[first_conv_name][0]);
+                        // }
                     }
                     else
                     {
@@ -381,6 +443,7 @@ int NetQuantize::find_top_scale()
                                 {
                                     layer_next_2_name_0 = layers[blobs[layer_next_1->tops[0]].consumers[0]]->name;
                                     layer_next_2_name_1 = layers[blobs[layer_next_1->tops[1]].consumers[0]]->name;
+                                    condition2 = true;
                                 }
                                 else if ((layers[blobs[layer_next_1->tops[1]].consumers[0]]->type == "Convolution" ||
                                           layers[blobs[layer_next_1->tops[1]].consumers[0]]->type == "ConvolutionDepthWise") &&
@@ -388,9 +451,8 @@ int NetQuantize::find_top_scale()
                                 {
                                     layer_next_2_name_0 = layers[blobs[layer_next_1->tops[1]].consumers[0]]->name;
                                     layer_next_2_name_1 = layers[blobs[layer_next_1->tops[0]].consumers[0]]->name;
+                                    condition2 = true;
                                 }
-
-                                condition2 = true;
                             }
                         }
 
@@ -455,6 +517,7 @@ std::string NetQuantize::find_first_conv(std::string name)
     {
         return layer->name;
     }
+
     if (layer->type == "Slice")
     {
         int layer_next_index = blobs[layer->tops[1]].consumers[0];
@@ -470,17 +533,36 @@ std::string NetQuantize::find_first_conv(std::string name)
     }
     else
     {
-        for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
+        if (layer->type == "Split")
         {
-            int layer_next_index = blobs[layer->tops[0]].consumers[n];
-            ncnn::Layer *layer_next = layers[layer_next_index];
-            if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise" || layer_next->type == "InnerProduct")
+            for (size_t n = 0; n < blobs[layer->tops[1]].consumers.size(); n++)
             {
-                return layer_next->name;
+                int layer_next_index = blobs[layer->tops[1]].consumers[n];
+                ncnn::Layer *layer_next = layers[layer_next_index];
+                if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise" || layer_next->type == "InnerProduct")
+                {
+                    return layer_next->name;
+                }
+                else
+                {
+                    return find_first_conv(layer_next->name);
+                }
             }
-            else
+        }
+        else
+        {
+            for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
             {
-                return find_first_conv(layer_next->name);
+                int layer_next_index = blobs[layer->tops[0]].consumers[n];
+                ncnn::Layer *layer_next = layers[layer_next_index];
+                if (layer_next->type == "Convolution" || layer_next->type == "ConvolutionDepthWise" || layer_next->type == "InnerProduct")
+                {
+                    return layer_next->name;
+                }
+                else
+                {
+                    return find_first_conv(layer_next->name);
+                }
             }
         }
     }
@@ -506,6 +588,30 @@ std::string NetQuantize::find_first_shufflechannel(std::string name)
         else
         {
             return find_first_shufflechannel(layer_next->name);
+        }
+    }
+}
+
+std::string NetQuantize::find_first_split(std::string name)
+{
+    ncnn::Layer *layer = layers[find_layer_index_by_name(name.c_str())];
+    // if this layer is last layer
+    if (blobs[layer->tops[0]].consumers.size() == 0)
+    {
+        fprintf(stderr, "Nor found shufflechannel layer\n");
+        return layer->name;
+    }
+    for (size_t n = 0; n < blobs[layer->tops[0]].consumers.size(); n++)
+    {
+        int layer_next_index = blobs[layer->tops[0]].consumers[n];
+        ncnn::Layer *layer_next = layers[layer_next_index];
+        if (layer_next->type == "Split")
+        {
+            return layer_next->name;
+        }
+        else
+        {
+            return find_first_split(layer_next->name);
         }
     }
 }
@@ -708,6 +814,46 @@ void NetQuantize::fill_scale_shufflechannel(std::vector<float> &layer_scale, int
     }
 }
 
+void NetQuantize::split_scale(std::string name, std::vector<float> top_scales)
+{
+    float left_scale = top_scales[0];
+    float right_scale = top_scales[1];
+    int left = 1;
+    float factor;
+    int Bint;
+    int BitN = 7;
+    int Bfrac;
+    int right_shift;
+    int dst;
+    std::vector<int> factors;
+    factors.resize(3);
+    std::string split_name;
+    float accuracy;
+    if (left_scale < right_scale)
+    {
+        left = -1;
+        factor = left_scale / right_scale;
+    }
+    else
+    {
+        factor = right_scale / left_scale;
+    }
+
+    //Bint = (int)(log2(factor) + 0.5);
+    Bint = (int)(log2(factor) + 0.5);
+    Bfrac = BitN - Bint;
+    accuracy = pow((float)2.0, (float)(0 - Bfrac));
+    dst = int(factor / accuracy + 0.5);
+    right_shift = 0 - Bfrac;
+    factors[0] = left;
+    factors[1] = dst;
+    factors[2] = right_shift;
+    fprintf(stdout, "xxxx %f %d-%d $ %d\n", factor, left, dst, right_shift);
+
+    split_name = find_first_split(name);
+    split_factor_table[split_name] = factors;
+}
+
 int NetQuantize::quantize_convolution()
 {
     const int layer_count = static_cast<int>(layers.size());
@@ -736,6 +882,7 @@ int NetQuantize::quantize_convolution()
         ncnn::Convolution *convolution = (ncnn::Convolution *)layers[i];
 
         std::vector<float> weight_data_int8_scales = iter->second;
+        std::vector<float> blob_int8_scales = iter_data->second;
 
         fprintf(stderr, "quantize_convolution %s\n", convolution->name.c_str());
 
@@ -767,6 +914,50 @@ int NetQuantize::quantize_convolution()
             }
 
             convolution->weight_data = int8_weight_data;
+        }
+
+        // quantize bias to int32
+        if (convolution->bias_term)
+        {
+            ncnn::Mat int32_bias_data(convolution->num_output, (size_t)4u); // 4u -> int32
+            if (int32_bias_data.empty())
+                return -100;
+
+            for (int n = 0; n < convolution->num_output; n++)
+            {
+                ncnn::Layer *op = ncnn::create_layer(ncnn::LayerType::Quantize);
+
+                ncnn::ParamDict pd;
+                pd.set(0, weight_data_int8_scales[n] * blob_int8_scales[0]); // bias_scale = weight_scale * bottom_blob_scale
+
+                op->load_param(pd);
+
+                ncnn::Option opt;
+                opt.blob_allocator = int32_bias_data.allocator;
+                opt.use_int32_storage = true;
+
+                const ncnn::Mat bias_data_n = convolution->bias_data.range(n, 1);
+                ncnn::Mat int32_bias_data_n = int32_bias_data.range(n, 1);
+                op->forward(bias_data_n, int32_bias_data_n, opt);
+
+                delete op;
+            }
+
+            // ncnn::Mat m = int32_bias_data;
+            // for (int c = 0; c < m.c; c++)
+            // {
+            //     const int *ptr = m.channel(c);
+            //     for (int h = 0; h < m.h; h++)
+            //     {
+            //         for (int w = 0; w < m.w; w++)
+            //         {
+            //             fprintf(stdout, "%d ", ptr[w]);
+            //         }
+            //         ptr += m.w;
+            //         fprintf(stdout, "\n");
+            //     }
+            // }
+            convolution->bias_data = int32_bias_data;
         }
 
         convolution->int8_scale_term = 2;
@@ -803,6 +994,7 @@ int NetQuantize::quantize_convolutiondepthwise()
         ncnn::ConvolutionDepthWise *convdw = (ncnn::ConvolutionDepthWise *)layers[i];
 
         std::vector<float> weight_data_int8_scales = iter->second;
+        std::vector<float> blob_int8_scales = iter_data->second;
 
         fprintf(stderr, "quantize_convolution %s\n", convdw->name.c_str());
 
@@ -834,6 +1026,36 @@ int NetQuantize::quantize_convolutiondepthwise()
             }
 
             convdw->weight_data = int8_weight_data;
+        }
+
+        // quantize bias to int8 will cause big error, quantize bias to int32
+        if (convdw->bias_term)
+        {
+            ncnn::Mat int32_bias_data(convdw->num_output, (size_t)4u); // 4u -> int32
+            if (int32_bias_data.empty())
+                return -100;
+
+            for (int n = 0; n < convdw->num_output; n++)
+            {
+                ncnn::Layer *op = ncnn::create_layer(ncnn::LayerType::Quantize);
+
+                ncnn::ParamDict pd;
+                pd.set(0, weight_data_int8_scales[n] * blob_int8_scales[0]); // bias_scale = weight_scale * bottom_blob_scale
+
+                op->load_param(pd);
+
+                ncnn::Option opt;
+                opt.blob_allocator = int32_bias_data.allocator;
+                opt.use_int32_storage = true;
+
+                const ncnn::Mat bias_data_n = convdw->bias_data.range(n, 1);
+                ncnn::Mat int32_bias_data_n = int32_bias_data.range(n, 1);
+                op->forward(bias_data_n, int32_bias_data_n, opt);
+
+                delete op;
+            }
+
+            convdw->bias_data = int32_bias_data;
         }
 
         convdw->int8_scale_term = 1;
@@ -870,6 +1092,7 @@ int NetQuantize::quantize_innerproduct()
         ncnn::InnerProduct *fc = (ncnn::InnerProduct *)layers[i];
 
         std::vector<float> weight_data_int8_scales = iter->second;
+        std::vector<float> blob_int8_scales = iter_data->second;
 
         fprintf(stderr, "quantize_convolution %s\n", fc->name.c_str());
 
@@ -901,6 +1124,36 @@ int NetQuantize::quantize_innerproduct()
             }
 
             fc->weight_data = int8_weight_data;
+        }
+
+        // quantize bias to int32
+        if (fc->bias_term)
+        {
+            ncnn::Mat int32_bias_data(fc->num_output, (size_t)4u); // 4u -> int32
+            if (int32_bias_data.empty())
+                return -100;
+
+            for (int n = 0; n < fc->num_output; n++)
+            {
+                ncnn::Layer *op = ncnn::create_layer(ncnn::LayerType::Quantize);
+
+                ncnn::ParamDict pd;
+                pd.set(0, weight_data_int8_scales[n] * blob_int8_scales[0]); // bias_scale = weight_scale * bottom_blob_scale
+
+                op->load_param(pd);
+
+                ncnn::Option opt;
+                opt.blob_allocator = int32_bias_data.allocator;
+                opt.use_int32_storage = true;
+
+                const ncnn::Mat bias_data_n = fc->bias_data.range(n, 1);
+                ncnn::Mat int32_bias_data_n = int32_bias_data.range(n, 1);
+                op->forward(bias_data_n, int32_bias_data_n, opt);
+
+                delete op;
+            }
+
+            fc->bias_data = int32_bias_data;
         }
 
         fc->int8_scale_term = 2;
@@ -1080,6 +1333,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             fprintf_param_value(" 0=%d", op_type)
                 fprintf_param_value(" 1=%d", with_scalar)
                     fprintf_param_value(" 2=%f", b)
+                        fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "Clip")
         {
@@ -1088,6 +1342,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
 
             fprintf_param_value(" 0=%f", min)
                 fprintf_param_value(" 1=%f", max)
+                    fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "Concat")
         {
@@ -1095,6 +1350,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             ncnn::Concat *op_default = (ncnn::Concat *)layer_default;
 
             fprintf_param_value(" 0=%d", axis)
+                fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "Convolution")
         {
@@ -1145,25 +1401,48 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             // write int8_scale data
             if (op->int8_scale_term)
             {
-                std::vector<float> weight_int8scale;
-                std::vector<float> blob_int8scale;
+                // std::vector<float> weight_int8scale;
+                // std::vector<float> blob_int8scale;
 
-                char key[256];
-                sprintf(key, "%s_param_0", layers[i]->name.c_str());
+                // char key[256];
+                // sprintf(key, "%s_param_0", layers[i]->name.c_str());
 
-                if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                // if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                // {
+                //     weight_int8scale = weight_int8scale_table[std::string(key)];
+                // }
+
+                // if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                // {
+                //     blob_int8scale = blob_int8scale_table[layer->name];
+                // }
+
+                // // write int8_scale data
+                // fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
+                // fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+
+                std::vector<int> int_scales;
+                int right_shift;
+                if (int_result_blob_int8scale_table.find(layer->name) != int_result_blob_int8scale_table.end())
                 {
-                    weight_int8scale = weight_int8scale_table[std::string(key)];
+                    int_scales = int_result_blob_int8scale_table[layer->name];
                 }
 
-                if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                // if (top_scale_right_shift.find(layer->name) != top_scale_right_shift.end())
+                // {
+                //     right_shift = top_scale_right_shift[layer->name];
+                // }
+                std::vector<int> int_top_scales;
+                if (int_top_blob_int8scale_table.find(layer->name) != int_top_blob_int8scale_table.end())
                 {
-                    blob_int8scale = blob_int8scale_table[layer->name];
+                    int_top_scales = int_top_blob_int8scale_table[layer->name];
                 }
 
-                // write int8_scale data
-                fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
-                fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+                // write int8_scale data and shift
+                fwrite(int_scales.data(), sizeof(int), int_scales.size(), bp);
+                fwrite(int_top_scales.data(), sizeof(int), int_top_scales.size(), bp);
+                fprintf(pp, " 18=%d", int_top_scales.size());
+                // fwrite(&right_shift, sizeof(int), 1, bp);
             }
         }
         else if (layer->type == "ConvolutionDepthWise")
@@ -1216,25 +1495,47 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             // write int8_scale data
             if (op->int8_scale_term)
             {
-                std::vector<float> weight_int8scale;
-                std::vector<float> blob_int8scale;
+                // std::vector<float> weight_int8scale;
+                // std::vector<float> blob_int8scale;
 
-                char key[256];
-                sprintf(key, "%s_param_0", layers[i]->name.c_str());
+                // char key[256];
+                // sprintf(key, "%s_param_0", layers[i]->name.c_str());
 
-                if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                // if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                // {
+                //     weight_int8scale = weight_int8scale_table[std::string(key)];
+                // }
+
+                // if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                // {
+                //     blob_int8scale = blob_int8scale_table[layer->name];
+                // }
+
+                // // write int8_scale data
+                // fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
+                // fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+
+                std::vector<int> int_scales;
+                int right_shift;
+                if (int_result_blob_int8scale_table.find(layer->name) != int_result_blob_int8scale_table.end())
                 {
-                    weight_int8scale = weight_int8scale_table[std::string(key)];
+                    int_scales = int_result_blob_int8scale_table[layer->name];
                 }
+                // if (top_scale_right_shift.find(layer->name) != top_scale_right_shift.end())
+                // {
+                //     right_shift = top_scale_right_shift[layer->name];
+                // }
 
-                if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                std::vector<int> int_top_scales;
+                if (int_top_blob_int8scale_table.find(layer->name) != int_top_blob_int8scale_table.end())
                 {
-                    blob_int8scale = blob_int8scale_table[layer->name];
+                    int_top_scales = int_top_blob_int8scale_table[layer->name];
                 }
-
-                // write int8_scale data
-                fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
-                fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+                // write int8_scale data and shift
+                fwrite(int_scales.data(), sizeof(int), int_scales.size(), bp);
+                fwrite(int_top_scales.data(), sizeof(int), int_top_scales.size(), bp);
+                fprintf(pp, " 18=%d", int_top_scales.size());
+                // fwrite(&right_shift, sizeof(int), 1, bp);
             }
         }
         else if (layer->type == "Crop")
@@ -1404,6 +1705,12 @@ int NetQuantize::save(const char *parampath, const char *binpath)
                 fprintf_param_value(" 1=%f", scale)
                     fprintf_param_value(" 2=%f", shift)
         }
+        else if (layer->type == "Flatten")
+        {
+            ncnn::Flatten *op = (ncnn::Flatten *)layer;
+            ncnn::Flatten *op_default = (ncnn::Flatten *)layer_default;
+            fprintf(pp, " 8=%d", 1);
+        }
         else if (layer->type == "InnerProduct")
         {
             ncnn::InnerProduct *op = (ncnn::InnerProduct *)layer;
@@ -1425,25 +1732,39 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             // write int8_scale data
             if (op->int8_scale_term)
             {
-                std::vector<float> weight_int8scale;
-                std::vector<float> blob_int8scale;
+                // std::vector<float> weight_int8scale;
+                // std::vector<float> blob_int8scale;
 
-                char key[256];
-                sprintf(key, "%s_param_0", layers[i]->name.c_str());
+                // char key[256];
+                // sprintf(key, "%s_param_0", layers[i]->name.c_str());
 
-                if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                // if (weight_int8scale_table.find(std::string(key)) != weight_int8scale_table.end())
+                // {
+                //     weight_int8scale = weight_int8scale_table[std::string(key)];
+                // }
+
+                // if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
+                // {
+                //     blob_int8scale = blob_int8scale_table[layer->name];
+                // }
+
+                // // write int8_scale data
+                // fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
+                // fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+                std::vector<int> int_scales;
+                int right_shift;
+                if (int_result_blob_int8scale_table.find(layer->name) != int_result_blob_int8scale_table.end())
                 {
-                    weight_int8scale = weight_int8scale_table[std::string(key)];
+                    int_scales = int_result_blob_int8scale_table[layer->name];
                 }
 
-                if (blob_int8scale_table.find(layer->name) != blob_int8scale_table.end())
-                {
-                    blob_int8scale = blob_int8scale_table[layer->name];
-                }
-
-                // write int8_scale data
-                fwrite(weight_int8scale.data(), sizeof(float), weight_int8scale.size(), bp);
-                fwrite(blob_int8scale.data(), sizeof(float), blob_int8scale.size(), bp);
+                // if (top_scale_right_shift.find(layer->name) != top_scale_right_shift.end())
+                // {
+                //     right_shift = top_scale_right_shift[layer->name];
+                // }
+                // write int8_scale data and shift
+                fwrite(int_scales.data(), sizeof(int), int_scales.size(), bp);
+                // fwrite(&right_shift, sizeof(int), 1, bp);
             }
         }
         else if (layer->type == "Input")
@@ -1454,6 +1775,20 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             fprintf_param_value(" 0=%d", w)
                 fprintf_param_value(" 1=%d", h)
                     fprintf_param_value(" 2=%d", c)
+                        fprintf(pp, " 8=%d", 1);
+            std::vector<int> int_scales;
+            // int right_shift;
+            if (int_result_blob_int8scale_table.find(layer->name) != int_result_blob_int8scale_table.end())
+            {
+                int_scales = int_result_blob_int8scale_table[layer->name];
+            }
+            // if (top_scale_right_shift.find(layer->name) != top_scale_right_shift.end())
+            // {
+            //     right_shift = top_scale_right_shift[layer->name];
+            // }
+            // write int8_scale data and shift
+            fwrite(int_scales.data(), sizeof(int), int_scales.size(), bp);
+            // fwrite(&right_shift, sizeof(int), 1, bp);
         }
         else if (layer->type == "InstanceNorm")
         {
@@ -1537,6 +1872,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
                         fprintf_param_value(" 3=%d", right)
                             fprintf_param_value(" 4=%d", type)
                                 fprintf_param_value(" 5=%f", value)
+                                    fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "Permute")
         {
@@ -1544,6 +1880,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             ncnn::Permute *op_default = (ncnn::Permute *)layer_default;
 
             fprintf_param_value(" 0=%d", order_type)
+                fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "PixelShuffle")
         {
@@ -1583,6 +1920,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             }
             fprintf_param_value(" 4=%d", global_pooling)
                 fprintf_param_value(" 5=%d", pad_mode)
+                    fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "Power")
         {
@@ -1680,6 +2018,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             ncnn::ReLU *op_default = (ncnn::ReLU *)layer_default;
 
             fprintf_param_value(" 0=%f", slope)
+                fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "Reorg")
         {
@@ -1708,6 +2047,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
                 fprintf_param_value(" 1=%d", h)
                     fprintf_param_value(" 2=%d", c)
                         fprintf_param_value(" 3=%d", permute)
+                            fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "ROIAlign")
         {
@@ -1755,6 +2095,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
                     fprintf_param_int_array(0, op->slices, pp);
             }
             fprintf_param_value(" 1=%d", axis)
+                fprintf(pp, " 8=%d", 1);
         }
         else if (layer->type == "Softmax")
         {
@@ -1768,6 +2109,15 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             {
                 int fixbug0 = 1;
                 fprintf(pp, " 1=%d", fixbug0);
+            }
+        }
+        else if (layer->type == "Split")
+        {
+            fprintf(pp, " 8=%d", 1);
+            if (split_factor_table.count(layer->name) == 1)
+            {
+                std::vector<int> factors = split_factor_table[layer->name];
+                fwrite(factors.data(), sizeof(int), factors.size(), bp);
             }
         }
         else if (layer->type == "Threshold")
@@ -1867,16 +2217,139 @@ int main(int argc, char **argv)
     // Find top scale
     quantizer.find_top_scale();
     std::map<std::string, std::vector<float>>::iterator iter;
-    for (iter = quantizer.top_blob_int8scale_table.begin(); iter != quantizer.top_blob_int8scale_table.end(); iter++)
+    std::map<std::string, std::vector<float>>::iterator iter_bottom = quantizer.blob_int8scale_table.begin();
+    std::map<std::string, std::vector<float>>::iterator iter_weight = quantizer.weight_int8scale_table.begin();
+
+    for (iter = quantizer.top_blob_int8scale_table.begin(); iter != quantizer.top_blob_int8scale_table.end();)
     {
+        std::string input = "input";
         std::string name = iter->first;
-        std::vector<float> scales = iter->second;
-        fprintf(stdout, "%s ", name.c_str());
-        for (int i = 0; i < scales.size(); i++)
+        std::vector<float> top_scales = iter->second;
+        std::vector<float> result_scales;
+        if (name.find(input) != std::string::npos)
         {
-            fprintf(stdout, "%f ", scales[i]);
+            result_scales.push_back(top_scales[0]);
+            quantizer.result_blob_int8scale_table[iter->first] = result_scales;
+            iter++;
+        }
+        else
+        {
+            std::vector<float> bottom_scales = iter_bottom->second;
+            std::vector<float> weight_scales = iter_weight->second;
+
+            int size = top_scales.size();
+            if (size == 1)
+            {
+                for (int i = 0; i < weight_scales.size(); i++)
+                {
+                    float result_scale = top_scales[0] / (weight_scales[i] * bottom_scales[0]);
+                    result_scales.push_back(result_scale);
+                }
+                quantizer.result_blob_int8scale_table[name] = result_scales;
+            }
+            else if (size == 2)
+            {
+                // for (int i = 0; i < weight_scales.size() / 2; i++)
+                // {
+                //     float result_scale = top_scales[0] / (weight_scales[i] * bottom_scales[0]);
+                //     result_scales.push_back(result_scale);
+                // }
+
+                // for (int i = weight_scales.size() / 2; i < weight_scales.size(); i++)
+                // {
+                //     float result_scale = top_scales[1] / (weight_scales[i] * bottom_scales[0]);
+                //     result_scales.push_back(result_scale);
+                // }
+                // TODO for mbv2: split will cause 2 top_scale condition
+                // for (int i = 0; i < weight_scales.size(); i++)
+                // {
+                //     float result_scale = top_scales[0] / (weight_scales[i] * bottom_scales[0]);
+                //     result_scales.push_back(result_scale);
+                // }
+
+                // for (int i = 0; i < weight_scales.size(); i++)
+                // {
+                //     float result_scale = top_scales[1] / (weight_scales[i] * bottom_scales[0]);
+                //     result_scales.push_back(result_scale);
+                // }
+
+                float scale = top_scales[0] > top_scales[1] ? top_scales[0] : top_scales[1];
+                for (int i = 0; i < weight_scales.size(); i++)
+                {
+                    float result_scale = scale / (weight_scales[i] * bottom_scales[0]);
+                    result_scales.push_back(result_scale);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < weight_scales.size(); i++)
+                {
+                    float result_scale = top_scales[i] / (weight_scales[i] * bottom_scales[0]);
+                    result_scales.push_back(result_scale);
+                }
+                quantizer.result_blob_int8scale_table[name] = result_scales;
+            }
+            iter++, iter_bottom++, iter_weight++;
+        }
+
+        std::vector<int> int_scales;
+        int_scales.resize(result_scales.size() + 1);
+        int BitN = 7;
+        int N = vector_float2int(&int_scales[0], &result_scales[0], result_scales.size(), BitN);
+        int_scales[result_scales.size()] = N;
+        quantizer.int_result_blob_int8scale_table[name] = int_scales;
+        fprintf(stdout, "%s-%d ", name.c_str(), N);
+        // for (int i = 0; i < int_scales.size(); i++)
+        // {
+        //     fprintf(stdout, "%d ", int_scales[i]);
+        // }
+        // fprintf(stdout, "\n");
+
+        // fprintf(stdout, "#######################################\n");
+
+        // for (int i = 0; i < top_scales.size(); i++)
+        // {
+        //     fprintf(stdout, "%f ", top_scales[i]);
+        // }
+        // fprintf(stdout, "\n");
+
+        for (int i = 0; i < result_scales.size(); i++)
+        {
+            fprintf(stdout, "%f ", result_scales[i]);
         }
         fprintf(stdout, "\n");
+        // fprintf(stdout, "#######################################\n");
+
+        // for (int i = 0; i < weight_scales.size(); i++)
+        // {
+        //     fprintf(stdout, "%f ", weight_scales[i]);
+        // }
+        // fprintf(stdout, "\n");
+    }
+
+    std::map<std::string, std::vector<float>>::iterator top_scale_iter;
+    for (top_scale_iter = quantizer.top_blob_int8scale_table.begin(); top_scale_iter != quantizer.top_blob_int8scale_table.end(); top_scale_iter++)
+    {
+        std::string name = top_scale_iter->first;
+        std::vector<float> top_scales = top_scale_iter->second;
+        if (top_scales.size() == 2)
+        {
+            quantizer.split_scale(name, top_scales);
+        }
+    }
+
+    std::map<std::string, std::vector<float>>::iterator top_scale_float;
+    for (top_scale_float = quantizer.top_blob_int8scale_table.begin(); top_scale_float != quantizer.top_blob_int8scale_table.end(); top_scale_float++)
+    {
+        std::string name = top_scale_float->first;
+        std::vector<float> top_scales = top_scale_float->second;
+        int BitN = 7;
+        std::vector<int> int_scales;
+        int_scales.resize(top_scales.size() + 1);
+        int N = vector_float2int(&int_scales[0], &top_scales[0], top_scales.size(), BitN);
+        fprintf(stdout, "kkkkk %d - %d\n", N, top_scales.size());
+        int_scales[top_scales.size()] = N;
+        quantizer.int_top_blob_int8scale_table[name] = int_scales;
     }
 
     quantizer.quantize_convolution();

@@ -33,7 +33,6 @@ public:
 public:
     int axis;
     int use_int8_inference;
-    int position_scale_in = 18;
 };
 
 } // namespace ncnn

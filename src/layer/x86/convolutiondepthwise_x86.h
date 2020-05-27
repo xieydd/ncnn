@@ -36,8 +36,6 @@ protected:
 public:
     Layer *activation;
     std::vector<ncnn::Layer *> group_ops;
-    int position_scale_in = 18;
-    int position_bottom_scale = 5;
 };
 
 } // namespace ncnn

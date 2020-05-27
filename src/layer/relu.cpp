@@ -29,7 +29,7 @@ ReLU::ReLU()
 int ReLU::load_param(const ParamDict &pd)
 {
     slope = pd.get(0, 0.f);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
 
     return 0;
 }
@@ -47,7 +47,7 @@ int ReLU::forward_inplace_int8(Mat &bottom_top_blob, const Option &opt) const
         for (int q = 0; q < channels; q++)
         {
             //signed char *ptr = bottom_top_blob.channel(q);
-            int *ptr = bottom_top_blob.channel(q);
+            signed char *ptr = bottom_top_blob.channel(q);
 
             for (int i = 0; i < size; i++)
             {

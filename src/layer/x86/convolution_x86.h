@@ -48,8 +48,6 @@ public:
     // int8
     bool use_winograd3x3_int8;
     Mat weight_3x3_winograd23_data_int8;
-    int position_scale_in = 18;
-    int position_bottom_scale = 5;
 };
 
 } // namespace ncnn

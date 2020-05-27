@@ -22,6 +22,15 @@ static inline signed char float2int8(float v)
     return (signed char)int32;
 }
 
+static inline signed char int2int8(float int32)
+{
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
+    return (signed char)int32;
+}
+
 static void convdw3x3s1_int8_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Option &opt)
 {
     int w = bottom_blob.w;
@@ -151,7 +160,7 @@ static void convdw3x3s2_int8_sse(const Mat &bottom_blob, Mat &top_blob, const Ma
     }
 }
 
-static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<int> scales_dequant, const Option &opt)
+static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<int> scales_dequant, const Option &opt, int right_shift)
 {
     int w = bottom_blob.w;
     //int h = bottom_blob.h;
@@ -168,7 +177,7 @@ static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
     for (int p = 0; p < outch; p++)
     {
         Mat out = top_blob.channel(p);
-        int *outptr = out;
+        signed char *outptr = out;
 
         //const float scale_dequant = scales_dequant[p];
         const int scale_dequant = scales_dequant[p];
@@ -176,7 +185,7 @@ static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
         const int32_t bias0 = bias ? bias[p] : 0;
 
         //out.fill(bias0);
-        out.fill(0);
+        out.fill((signed char)0);
 
         const signed char *kernel0 = (const signed char *)kernel + p * 9;
 
@@ -205,7 +214,8 @@ static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
                 sum += (int)r2[2] * (int)kernel0[8];
 
                 //*outptr += (float)sum * scale_dequant;
-                *outptr += (sum + bias0) * scale_dequant;
+                *outptr += right_shift < 0 ? int2int8(((sum + bias0) * scale_dequant) >> (-right_shift)) : int2int8(((sum + bias0) * scale_dequant) << (right_shift));
+                // *outptr += right_shift < 0 ? float2int8(((sum + bias0) * scale_dequant) >> (-right_shift)) : float2int8(((sum + bias0) * scale_dequant) << (right_shift));
 
                 r0++;
                 r1++;
@@ -220,7 +230,7 @@ static void convdw3x3s1_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
     }
 }
 
-static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<int> scales_dequant, const Option &opt)
+static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, const Mat &_kernel, const Mat &_bias, std::vector<int> scales_dequant, const Option &opt, int right_shift)
 {
     int w = bottom_blob.w;
     //int h = bottom_blob.h;
@@ -239,7 +249,7 @@ static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
     for (int p = 0; p < outch; p++)
     {
         Mat out = top_blob.channel(p);
-        int *outptr = out;
+        signed char *outptr = out;
 
         //const float scale_dequant = scales_dequant[p];
         const int scale_dequant = scales_dequant[p];
@@ -247,7 +257,7 @@ static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
         const int32_t bias0 = bias ? bias[p] : 0;
 
         //out.fill(bias0);
-        out.fill(0);
+        out.fill((signed char)0);
 
         const signed char *kernel0 = (const signed char *)kernel + p * 9;
 
@@ -277,7 +287,8 @@ static void convdw3x3s2_int8_dequant_sse(const Mat &bottom_blob, Mat &top_blob, 
                 sum += (int)r2[2] * (int)kernel0[8];
 
                 //*outptr += (float)sum * scale_dequant;
-                *outptr += (sum + bias0) * scale_dequant;
+                //*outptr += (sum + bias0) * scale_dequant;
+                *outptr += right_shift < 0 ? int2int8(((sum + bias0) * scale_dequant) >> (-right_shift)) : int2int8(((sum + bias0) * scale_dequant) << (right_shift));
 
                 r0 += 2;
                 r1 += 2;

@@ -27,7 +27,7 @@ int Slice::load_param(const ParamDict &pd)
 {
     slices = pd.get(0, Mat());
     axis = pd.get(1, 0);
-    use_int8_inference = pd.get(7, 0);
+    use_int8_inference = pd.get(8, 0);
 
     return 0;
 }
@@ -272,8 +272,8 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
             if (top_blob.empty())
                 return -100;
 
-            const int *ptr = (const int *)bottom_blob + q;
-            int *outptr = top_blob;
+            const signed char *ptr = (const signed char *)bottom_blob + q;
+            signed char *outptr = top_blob;
             memcpy(outptr, ptr, slice * elemsize);
 
             q += slice;
@@ -303,8 +303,8 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
 
             int size = w * slice;
 
-            const int *ptr = bottom_blob.row_int(q);
-            int *outptr = top_blob;
+            const signed char *ptr = bottom_blob.row_signed_char(q);
+            signed char *outptr = top_blob;
             memcpy(outptr, ptr, size * elemsize);
 
             q += slice;
@@ -335,8 +335,8 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
 #pragma omp parallel for num_threads(opt.num_threads)
             for (int j = 0; j < h; j++)
             {
-                int *outptr = top_blob.row_int(j);
-                const int *ptr = bottom_blob.row_int(j) + q;
+                signed char *outptr = top_blob.row_signed_char(j);
+                const signed char *ptr = bottom_blob.row_signed_char(j) + q;
                 memcpy(outptr, ptr, slice * elemsize);
             }
 
@@ -368,8 +368,8 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
 
             int size = static_cast<int>(bottom_blob.cstep * slice);
 
-            const int *ptr = bottom_blob.channel(q);
-            int *outptr = top_blob;
+            const signed char *ptr = bottom_blob.channel(q);
+            signed char *outptr = top_blob;
             memcpy(outptr, ptr, size * elemsize);
 
             q += slice;
@@ -403,8 +403,8 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
             {
                 int size = w * slice;
 
-                int *outptr = top_blob.channel(p);
-                const int *ptr = bottom_blob.channel(p).row_int(q);
+                signed char *outptr = top_blob.channel(p);
+                const signed char *ptr = bottom_blob.channel(p).row_signed_char(q);
                 memcpy(outptr, ptr, size * elemsize);
             }
 
@@ -437,12 +437,12 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
 #pragma omp parallel for num_threads(opt.num_threads)
             for (int p = 0; p < channels; p++)
             {
-                int *outptr = top_blob.channel(p);
+                signed char *outptr = top_blob.channel(p);
                 const Mat m = bottom_blob.channel(p);
 
                 for (int j = 0; j < h; j++)
                 {
-                    const int *ptr = m.row_int(j) + q;
+                    const signed char *ptr = m.row_signed_char(j) + q;
                     memcpy(outptr, ptr, slice * elemsize);
 
                     outptr += slice;
