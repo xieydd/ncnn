@@ -2307,17 +2307,17 @@ int main(int argc, char **argv)
 
         // fprintf(stdout, "#######################################\n");
 
-        // for (int i = 0; i < top_scales.size(); i++)
-        // {
-        //     fprintf(stdout, "%f ", top_scales[i]);
-        // }
-        // fprintf(stdout, "\n");
-
-        for (int i = 0; i < result_scales.size(); i++)
+        for (int i = 0; i < top_scales.size(); i++)
         {
-            fprintf(stdout, "%f ", result_scales[i]);
+            fprintf(stdout, "%f ", top_scales[i]);
         }
         fprintf(stdout, "\n");
+
+        // for (int i = 0; i < result_scales.size(); i++)
+        // {
+        //     fprintf(stdout, "%f ", result_scales[i]);
+        // }
+        // fprintf(stdout, "\n");
         // fprintf(stdout, "#######################################\n");
 
         // for (int i = 0; i < weight_scales.size(); i++)
@@ -2347,7 +2347,7 @@ int main(int argc, char **argv)
         std::vector<int> int_scales;
         int_scales.resize(top_scales.size() + 1);
         int N = vector_float2int(&int_scales[0], &top_scales[0], top_scales.size(), BitN);
-        fprintf(stdout, "kkkkk %d - %d\n", N, top_scales.size());
+        fprintf(stdout, "kkkkk %s %d - %d\n", name.c_str(), N, top_scales.size());
         int_scales[top_scales.size()] = N;
         quantizer.int_top_blob_int8scale_table[name] = int_scales;
     }

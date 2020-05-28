@@ -262,6 +262,21 @@ int Convolution_x86::forward(const Mat &bottom_blob, Mat &top_blob, const Option
     int outw = (w - kernel_extent_w) / stride_w + 1;
     int outh = (h - kernel_extent_h) / stride_h + 1;
 
+    // Mat m = bottom_blob_bordered;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const float *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%f ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
+
     // float32
     top_blob.create(outw, outh, num_output, elemsize, opt.blob_allocator);
     if (top_blob.empty())

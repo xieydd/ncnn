@@ -36,7 +36,7 @@ int Slice::forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_b
 {
     if (use_int8_inference)
     {
-        forward_int8(bottom_blobs, top_blobs, opt);
+        return forward_int8(bottom_blobs, top_blobs, opt);
     }
     const Mat &bottom_blob = bottom_blobs[0];
     int dims = bottom_blob.dims;
@@ -163,6 +163,21 @@ int Slice::forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_b
 
             q += slice;
         }
+        // Mat m = top_blobs[1];
+        // fprintf(stdout, "#############\n");
+        // for (int c = 0; c < m.c; c++)
+        // {
+        //     const float *ptr = m.channel(c);
+        //     for (int h = 0; h < m.h; h++)
+        //     {
+        //         for (int w = 0; w < m.w; w++)
+        //         {
+        //             fprintf(stdout, "%f ", ptr[w]);
+        //         }
+        //         ptr += m.w;
+        //         fprintf(stdout, "\n");
+        //     }
+        // }
 
         return 0;
     }

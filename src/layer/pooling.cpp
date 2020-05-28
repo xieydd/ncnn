@@ -61,6 +61,21 @@ int Pooling::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) c
     int channels = bottom_blob.c;
     size_t elemsize = bottom_blob.elemsize;
 
+    // Mat m = bottom_blob;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const float *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%f ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
+
     //     fprintf(stderr, "Pooling     input %d x %d  pad = %d %d %d %d  ksize=%d %d  stride=%d %d\n", w, h, pad_left, pad_right, pad_top, pad_bottom, kernel_w, kernel_h, stride_w, stride_h);
     if (global_pooling)
     {

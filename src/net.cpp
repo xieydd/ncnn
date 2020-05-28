@@ -525,7 +525,7 @@ int Net::load_model(const DataReader &dr)
         int lret = layer->load_model(mb);
         if (lret != 0)
         {
-            fprintf(stderr, "layer load_model %d failed\n", (int)i);
+            fprintf(stderr, "layer load_model %d %s failed\n", (int)i, (layer->name).c_str());
             ret = -1;
             break;
         }

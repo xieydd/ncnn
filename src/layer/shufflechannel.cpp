@@ -14,7 +14,8 @@
 
 #include "shufflechannel.h"
 
-namespace ncnn {
+namespace ncnn
+{
 
 DEFINE_LAYER_CREATOR(ShuffleChannel)
 
@@ -24,15 +25,15 @@ ShuffleChannel::ShuffleChannel()
     support_inplace = false;
 }
 
-int ShuffleChannel::load_param(const ParamDict& pd)
+int ShuffleChannel::load_param(const ParamDict &pd)
 {
     group = pd.get(0, 1);
-    num_output = pd.get(1, 24); 
+    num_output = pd.get(1, 24);
 
     return 0;
 }
 
-int ShuffleChannel::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+int ShuffleChannel::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
     int w = bottom_blob.w;
     int h = bottom_blob.h;
@@ -60,6 +61,24 @@ int ShuffleChannel::forward(const Mat& bottom_blob, Mat& top_blob, const Option&
             memcpy(top_blob.channel(dst_q), bottom_blob.channel(src_q), feature_sz);
         }
     }
+
+    // if (elemsize != 1)
+    // {
+    //     Mat m = top_blob;
+    //     for (int c = 0; c < m.c; c++)
+    //     {
+    //         const float *ptr = m.channel(c);
+    //         for (int h = 0; h < m.h; h++)
+    //         {
+    //             for (int w = 0; w < m.w; w++)
+    //             {
+    //                 fprintf(stdout, "%f ", ptr[w]);
+    //             }
+    //             ptr += m.w;
+    //             fprintf(stdout, "\n");
+    //         }
+    //     }
+    // }
     return 0;
 }
 
