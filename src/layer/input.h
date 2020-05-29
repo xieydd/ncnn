@@ -1,3 +1,10 @@
+/*
+ * @Author: xieydd
+ * @since: 2020-05-28 10:18:59
+ * @lastTime: 2020-05-28 11:26:04
+ * @LastAuthor: Do not edit
+ * @message: 
+ */
 // Tencent is pleased to support the open source community by making ncnn available.
 //
 // Copyright (C) 2017 THL A29 Limited, a Tencent company. All rights reserved.
@@ -29,7 +36,7 @@ public:
 
     virtual int forward_inplace(Mat &bottom_top_blob, const Option &opt) const;
 
-    virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
+    // virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
     int w;

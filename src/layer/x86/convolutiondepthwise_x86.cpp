@@ -37,6 +37,8 @@ int ConvolutionDepthWise_x86::create_pipeline(const Option &opt)
         activation = ncnn::create_layer(ncnn::LayerType::ReLU);
 
         ncnn::ParamDict pd;
+        if (int8_scale_term)
+            pd.set(7, 1);
         activation->load_param(pd);
     }
     else if (activation_type == 2)
@@ -342,9 +344,24 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
             Mat bottom_blob_int8_g = bottom_blob_unbordered.channel_range(channels_g * g, channels_g);
 
             //quantize_float32_to_int8(bottom_blob_g, bottom_blob_int8_g, bottom_blob_int8_scales[g], opt_g);
-            quantize_int_to_int8(bottom_blob_g, bottom_blob_int8_g, bottom_blob_int8_scales[g], position_bottom_scale, position_scale_in, opt_g);
+            const int *ptr = bottom_blob_int8_scales.channel(0);
+            quantize_int_to_int8(bottom_blob_g, bottom_blob_int8_g, ptr[g], position_bottom_scale, position_scale_in, opt_g);
         }
     }
+    // Mat m = bottom_blob_unbordered;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const signed char *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
 
     Mat bottom_blob_bordered = bottom_blob_unbordered;
     if (pad_left > 0 || pad_right > 0 || pad_top > 0 || pad_bottom > 0)
@@ -444,7 +461,7 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
 
                 float top_rescale = 1.f / ptr[g];
 
-                int scale_in_int = int(top_rescale * pow(2, position_scale_in + position_bottom_scale + 3) / ptr_w[g]);
+                int scale_in_int = static_cast<int>(round(top_rescale * pow(2, position_scale_in + position_bottom_scale + 3) / ptr_w[g]));
                 dequantize_scales.push_back(scale_in_int);
             }
 

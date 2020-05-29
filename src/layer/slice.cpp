@@ -36,7 +36,7 @@ int Slice::forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_b
 {
     if (use_int8_inference)
     {
-        forward_int8(bottom_blobs, top_blobs, opt);
+        return forward_int8(bottom_blobs, top_blobs, opt);
     }
     const Mat &bottom_blob = bottom_blobs[0];
     int dims = bottom_blob.dims;

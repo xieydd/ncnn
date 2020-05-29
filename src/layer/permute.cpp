@@ -37,7 +37,7 @@ int Permute::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) c
 {
     if (use_int8_inference)
     {
-        forward_int8(bottom_blob, top_blob, opt);
+        return forward_int8(bottom_blob, top_blob, opt);
     }
     int w = bottom_blob.w;
     int h = bottom_blob.h;

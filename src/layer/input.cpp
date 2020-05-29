@@ -41,31 +41,31 @@ int Input::forward_inplace(Mat & /*bottom_top_blob*/, const Option & /*opt*/) co
     return 0;
 }
 
-int Input::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
-{
-    Mat bottom_blob_int = bottom_blob;
-    if (!support_inplace)
-        return -1;
+// int Input::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
+// {
+//     Mat bottom_blob_int = bottom_blob;
+//     if (!support_inplace)
+//         return -1;
 
-    int w = bottom_blob.w;
-    int h = bottom_blob.h;
-    int channels = bottom_blob.c;
-    int size = w * h;
-    for (int q = 0; q < channels; q++)
-    {
-        const float *ptr = bottom_blob.channel(q);
-        int *outptr = top_blob.channel(q);
+//     int w = bottom_blob.w;
+//     int h = bottom_blob.h;
+//     int channels = bottom_blob.c;
+//     int size = w * h;
+//     for (int q = 0; q < channels; q++)
+//     {
+//         const float *ptr = bottom_blob.channel(q);
+//         int *outptr = top_blob.channel(q);
 
-        for (int i = 0; i < size; i++)
-        {
-            outptr[i] = int(ptr[i] * pow(2, position_scale_in));
-        }
-    }
-    top_blob = bottom_blob.clone(opt.blob_allocator);
-    if (top_blob.empty())
-        return -100;
+//         for (int i = 0; i < size; i++)
+//         {
+//             outptr[i] = int(ptr[i] * pow(2, position_scale_in));
+//         }
+//     }
+//     top_blob = bottom_blob.clone(opt.blob_allocator);
+//     if (top_blob.empty())
+//         return -100;
 
-    return forward_inplace(top_blob, opt);
-}
+//     return forward_inplace(top_blob, opt);
+// }
 
 } // namespace ncnn

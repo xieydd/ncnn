@@ -52,7 +52,8 @@ int Convolution_x86::create_pipeline(const Option &opt)
         activation = ncnn::create_layer(ncnn::LayerType::ReLU);
 
         ncnn::ParamDict pd;
-        pd.set(7, 1);
+        if (int8_scale_term)
+            pd.set(7, 1);
         activation->load_param(pd);
     }
     else if (activation_type == 2)
@@ -357,8 +358,9 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
         opt_g.use_int_internal = true;
 
         //quantize_float32_to_int8(bottom_blob, bottom_blob_unbordered, bottom_blob_int8_scale, opt_g);
+        // fprintf(stdout, "%d\n", bottom_blob_int8_scale);
         const char *get_name = "429";
-        if (strcmp(get_name, name.c_str()))
+        if (strcmp(get_name, name.c_str()) == 0)
         {
             Mat a = bottom_blob;
             for (int i = 0; i < bottom_blob.c; i++)
@@ -383,6 +385,21 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
             quantize_int_to_int8(bottom_blob, bottom_blob_unbordered, bottom_blob_int8_scale, position_bottom_scale, position_scale_in, opt_g);
         }
     }
+
+    // Mat m = bottom_blob_unbordered;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const signed char *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
 
     Mat bottom_blob_bordered = bottom_blob_unbordered;
     if (pad_left > 0 || pad_right > 0 || pad_top > 0 || pad_bottom > 0)
@@ -526,8 +543,7 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
                 else
                     scale_in = 1.f / (bottom_blob_int8_scale);
 
-                ;
-                int scale_in_int = int(scale_in * pow(2, position_scale_in + position_bottom_scale + 3) / ptr[p]);
+                int scale_in_int = static_cast<int>(round(scale_in * pow(2, position_scale_in + position_bottom_scale + 3) / ptr[p]));
                 dequantize_scales.push_back(scale_in_int);
             }
 

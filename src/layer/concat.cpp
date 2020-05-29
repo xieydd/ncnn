@@ -322,7 +322,7 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
         if (top_blob.empty())
             return -100;
 
-        int *outptr = top_blob;
+        float *outptr = top_blob;
         if (strcmp(type_name, name.c_str()) == 0)
         {
             for (size_t b = 0; b < bottom_blobs.size(); b++)

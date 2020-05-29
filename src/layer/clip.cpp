@@ -105,7 +105,7 @@ int Clip::forward_inplace(Mat &bottom_top_blob, const Option &opt) const
 {
     if (use_int8_inference)
     {
-        return Clip::forward_inplace_int8(bottom_top_blob, opt);
+        return forward_inplace_int8(bottom_top_blob, opt);
     }
 
     int w = bottom_top_blob.w;

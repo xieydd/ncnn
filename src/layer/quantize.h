@@ -30,7 +30,7 @@ public:
     virtual int forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const;
 
 public:
-    // float scale;
+    //float scale;
     int scale;
     int position_bottom_scale;
     int position_scale_in;

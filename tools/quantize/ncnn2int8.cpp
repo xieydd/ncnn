@@ -319,6 +319,7 @@ int NetQuantize::quantize_convolution()
 
                 ncnn::Option opt;
                 opt.blob_allocator = int32_bias_data.allocator;
+                opt.use_int32_storage = true;
 
                 const ncnn::Mat bias_data_n = convolution->bias_data.range(n, 1);
                 ncnn::Mat int32_bias_data_n = int32_bias_data.range(n, 1);
@@ -718,6 +719,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             ncnn::Concat *op_default = (ncnn::Concat *)layer_default;
 
             fprintf_param_value(" 0=%d", axis)
+                fprintf(pp, " 7=%d", 1);
         }
         else if (layer->type == "Convolution")
         {
@@ -1206,6 +1208,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             ncnn::Permute *op_default = (ncnn::Permute *)layer_default;
 
             fprintf_param_value(" 0=%d", order_type)
+                fprintf(pp, " 7=%d", 1);
         }
         else if (layer->type == "Pooling")
         {
@@ -1238,6 +1241,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
             }
             fprintf_param_value(" 4=%d", global_pooling)
                 fprintf_param_value(" 5=%d", pad_mode)
+                    fprintf(pp, " 7=%d", 1);
         }
         else if (layer->type == "Power")
         {
@@ -1363,6 +1367,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
                 fprintf_param_value(" 1=%d", h)
                     fprintf_param_value(" 2=%d", c)
                         fprintf_param_value(" 3=%d", permute)
+                            fprintf(pp, " 7=%d", 1);
         }
         else if (layer->type == "ROIAlign")
         {
@@ -1410,6 +1415,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
                     fprintf_param_int_array(0, op->slices, pp);
             }
             fprintf_param_value(" 1=%d", axis)
+                fprintf(pp, " 7=%d", 1);
         }
         else if (layer->type == "Softmax")
         {
@@ -1424,6 +1430,7 @@ int NetQuantize::save(const char *parampath, const char *binpath)
                 int fixbug0 = 1;
                 fprintf(pp, " 1=%d", fixbug0);
             }
+            fprintf(pp, " 7=%d", 1);
         }
         else if (layer->type == "Threshold")
         {

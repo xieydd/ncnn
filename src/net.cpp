@@ -532,9 +532,9 @@ int Net::load_model(const DataReader &dr)
 
     fuse_network();
 
-    for (size_t i=0; i<layers.size(); i++)
+    for (size_t i = 0; i < layers.size(); i++)
     {
-        Layer* layer = layers[i];
+        Layer *layer = layers[i];
 
         //Here we found inconsistent content in the parameter file.
         if (!layer)
@@ -1267,6 +1267,7 @@ int Net::forward_layer(int layer_index, std::vector<Mat> &blob_mats, Option &opt
             double end = get_current_time();
             benchmark(layer, bottom_blob, top_blob, start, end);
 #else
+            // fprintf(stdout, "nnnn %s\n", (layer->name).c_str());
             int ret = layer->forward(bottom_blob, top_blob, opt);
 #endif // NCNN_BENCHMARK
             if (ret != 0)

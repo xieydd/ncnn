@@ -455,6 +455,21 @@ int Softmax::forward_inplace_int8(Mat &bottom_top_blob, const Option &opt) const
             }
         }
 
+        // Mat m = bottom_top_blob;
+        // for (int c = 0; c < m.c; c++)
+        // {
+        //     const float *ptr = m.channel(c);
+        //     for (int h = 0; h < m.h; h++)
+        //     {
+        //         for (int w = 0; w < m.w; w++)
+        //         {
+        //             fprintf(stdout, "%f ", ptr[w]);
+        //         }
+        //         ptr += m.w;
+        //         fprintf(stdout, "\n");
+        //     }
+        // }
+
         return 0;
     }
 

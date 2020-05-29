@@ -318,6 +318,20 @@ int Pooling::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &o
 {
     // max value in NxN window
     // avg value in NxN window
+    // Mat m = bottom_blob;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const int *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
 
     int w = bottom_blob.w;
     int h = bottom_blob.h;

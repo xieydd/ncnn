@@ -48,7 +48,7 @@ int Reshape::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) c
 {
     if (use_int8_inference)
     {
-        forward_int8(bottom_blob, top_blob, opt);
+        return forward_int8(bottom_blob, top_blob, opt);
     }
     size_t elemsize = bottom_blob.elemsize;
     int total = bottom_blob.w * bottom_blob.h * bottom_blob.c;
@@ -136,6 +136,21 @@ int Reshape::forward(const Mat &bottom_blob, Mat &top_blob, const Option &opt) c
 
 int Reshape::forward_int8(const Mat &bottom_blob, Mat &top_blob, const Option &opt) const
 {
+    // Mat m = bottom_blob;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const int *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
+
     size_t elemsize = bottom_blob.elemsize;
     int total = bottom_blob.w * bottom_blob.h * bottom_blob.c;
 
