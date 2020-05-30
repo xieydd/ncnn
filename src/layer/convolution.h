@@ -72,7 +72,6 @@ public:
 
     Mat scales;
     Mat top_scales;
-    int top_scale_nums;
     bool use_int8_requantize;
 
     // implementation type, 0 means do not use auto pack model

@@ -1,3 +1,10 @@
+/*
+ * @Author: xieydd
+ * @since: 2020-05-30 18:11:21
+ * @lastTime: 2020-05-30 19:37:01
+ * @LastAuthor: Do not edit
+ * @message: 
+ */
 // Tencent is pleased to support the open source community by making ncnn available.
 //
 // Copyright (C) 2017 THL A29 Limited, a Tencent company. All rights reserved.
@@ -37,6 +44,7 @@ public:
 public:
     Mat factors_mat;
     int use_int8_inference;
+    int use_factor;
 };
 
 } // namespace ncnn

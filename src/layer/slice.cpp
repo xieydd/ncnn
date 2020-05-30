@@ -28,7 +28,15 @@ int Slice::load_param(const ParamDict &pd)
     slices = pd.get(0, Mat());
     axis = pd.get(1, 0);
     use_int8_inference = pd.get(8, 0);
+    use_factor = pd.get(9, 0);
 
+    return 0;
+}
+
+int Slice::load_model(const ModelBin &mb)
+{
+    if (use_factor):
+        scales = mb.load(2, 1);
     return 0;
 }
 
@@ -268,6 +276,11 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
     int dims = bottom_blob.dims;
     size_t elemsize = bottom_blob.elemsize;
     const int *slices_ptr = slices;
+    std::vector<int> factors;
+    factors.resize(2);
+    mat2vector(scales, factors);
+    int right_shift = factors[1];
+    int factor = factors[0];
 
     if (dims == 1) // axis == 0
     {
@@ -383,10 +396,31 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
 
             int size = static_cast<int>(bottom_blob.cstep * slice);
 
-            const signed char *ptr = bottom_blob.channel(q);
-            signed char *outptr = top_blob;
-            memcpy(outptr, ptr, size * elemsize);
-
+            if (i == 0)
+            {
+                const signed char *ptr = bottom_blob.channel(q);
+                signed char *outptr = top_blob;
+                memcpy(outptr, ptr, size * elemsize);
+            }
+            else
+            {
+                for (int i = q; i < slice + q; i++)
+                {
+                    const signed char *ptr = bottom_blob.channel(i);
+                    signed char *outptr = top_blob.channel(i);
+                    for (int j = 0; j < size; j++)
+                    {
+                        if (right_shift < 0)
+                        {
+                            outptr[j] = (ptr[j] * factor) >> (-right_shift);
+                        }
+                        else
+                        {
+                            outptr[j] = (ptr[j] * factor) << right_shift;
+                        }
+                    }
+                }
+            }
             q += slice;
         }
 

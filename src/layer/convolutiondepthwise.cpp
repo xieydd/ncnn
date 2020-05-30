@@ -49,7 +49,6 @@ int ConvolutionDepthWise::load_param(const ParamDict &pd)
     int8_scale_term = pd.get(8, 0);
     activation_type = pd.get(9, 0);
     activation_params = pd.get(10, Mat());
-    top_scale_nums = pd.get(18, 0);
 
     if (num_output % group != 0)
     {
@@ -76,12 +75,12 @@ int ConvolutionDepthWise::load_model(const ModelBin &mb)
     if (int8_scale_term == 1)
     {
         scales = mb.load(group + 1, 1);
-        top_scales = mb.load(top_scale_nums, 1);
+        top_scales = mb.load(2, 1);
     }
     else if (int8_scale_term == 2)
     {
         scales = mb.load(group + 1, 1);
-        top_scales = mb.load(top_scale_nums, 1);
+        top_scales = mb.load(2, 1);
     }
 
     return 0;

@@ -1,7 +1,7 @@
 <!--
  * @Author: xieydd
  * @since: 2020-05-08 10:36:58
- * @lastTime: 2020-05-27 09:52:59
+ * @lastTime: 2020-05-30 17:12:45
  * @LastAuthor: Do not edit
  * @message: 
  -->
@@ -131,3 +131,27 @@ mbv2 result
 |原始 ncnn float 和 半量化|	0.9999787|	0.2637	|2.95	|0.023
 
 2020-05-26 complete mbv2 int8 quantization
+
+
+
+2020-05-27~29
+out
+|测试方案	|cosine distance|	cosine angle	|绝对误差（MAE）|相对误差 （MRE）
+|  ----  | ----  | ---- | ---- | ----
+|原始 ncnn float 和 int32整体移位量化|	0.9776	|12.02|0.208|0.32
+|原始 ncnn float 和 半量化|	0.99567|	5.2599	|0.088|0.178
+845
+|测试方案	|cosine distance|	cosine angle	|绝对误差(MAE)|相对误差 （MRE）
+|  ----  | ----  | ---- | ---- | ----
+|原始 ncnn float 和 int32整体移位量化|	0.99990	|	0.6383|0.0008|0.23
+|原始 ncnn float 和 半量化|	0.99995|	0.4399	|0.00049|0.069
+
+
+2020-05-30 start full int8 quantization of shufflenetv2
+1. Clip not changed compared with mbv2, because shufflenetv2 not use clip
+2. conv and convdw detele top_scale_num , top_scale_num is always 2(top_scale_int and shift), innerproduct not use, don`t change
+3. change slice: add smallest_top_scale/real_top_scale( int and N_shift)
+4. change split :
+4. main change of ncnn2int8
+    1. find all top_scale, and smallest_top_scale/real_top_scale only for slice and split
+    2. storage it

@@ -73,7 +73,6 @@ public:
 
     Mat scales;
     Mat top_scales;
-    int top_scale_nums;
 
     bool use_int8_requantize;
 };

@@ -1,7 +1,7 @@
 /*
  * @Author: xieydd
  * @since: 2020-05-08 10:35:56
- * @lastTime: 2020-05-26 17:09:30
+ * @lastTime: 2020-05-30 19:52:56
  * @LastAuthor: Do not edit
  * @message: 
  */
@@ -46,13 +46,14 @@ Split::Split()
 int Split::load_param(const ParamDict &pd)
 {
     use_int8_inference = pd.get(8, 0);
+    use_factor = pd.get(9, 0);
     return 0;
 }
 
 int Split::load_model(const ModelBin &mb)
 {
-    if (use_int8_inference)
-        factors_mat = mb.load(3, 1);
+    if (use_factor)
+        factors_mat = mb.load(2, 1);
     return 0;
 }
 
@@ -73,70 +74,49 @@ int Split::forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_b
 
 int Split::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const
 {
-    std::vector<int> factors;
-    factors.resize(3);
-    mat2vector(factors_mat, factors);
-    int left = factors[0];
-    int dst = factors[1];
-    int right_shift = factors[2];
-    const Mat &bottom_blob = bottom_blobs[0];
-    //if (left >= 0 || name == "splitncnn_10")
-    if (name == "splitncnn_11")
+    if (use_factor)
     {
-        top_blobs[0] = bottom_blob;
-        Mat a = bottom_blob.clone();
-        // top_blobs[1].create(bottom_blob.h, bottom_blob.w, bottom_blob.c, 1u, opt.blob_allocator);
+        std::vector<int> factors;
+        factors.resize(2);
+        mat2vector(factors_mat, factors);
+        int dst = factors[0];
+        int right_shift = factors[1];
+        const Mat &bottom_blob = bottom_blobs[0];
 
-        for (int c = 0; c < bottom_blob.c; c++)
+        for (int i = 0; i < bottom_blobs.size(); i++)
         {
-            const signed char *input = bottom_blob.channel(c);
-            signed char *output = a.channel(c);
-            for (int h = 0; h < bottom_blob.h; h++)
+            Mat a = bottom_blobs[0].clone();
+            for (int c = 0; c < bottom_blob.c; c++)
             {
-                for (int w = 0; w < bottom_blob.w; w++)
+                const signed char *input = bottom_blob.channel(c);
+                signed char *output = a.channel(c);
+                for (int h = 0; h < bottom_blob.h; h++)
                 {
-                    if (right_shift < 0)
+                    for (int w = 0; w < bottom_blob.w; w++)
                     {
-                        output[w] = (input[w] * dst) >> (-right_shift);
+                        if (right_shift < 0)
+                        {
+                            output[w] = (input[w] * dst) >> (-right_shift);
+                        }
+                        else
+                        {
+                            output[w] = (input[w] * dst) << right_shift;
+                        }
                     }
-                    else
-                    {
-                        output[w] = (input[w] * dst) << right_shift;
-                    }
+                    input += bottom_blob.w;
+                    output += bottom_blob.w;
                 }
-                input += bottom_blob.w;
-                output += bottom_blob.w;
             }
+            top_blobs[i] = a;
         }
-        top_blobs[1] = a;
     }
     else
     {
-        top_blobs[1] = bottom_blob;
-        Mat a = bottom_blob.clone();
-        //top_blobs[0].create(bottom_blob.h, bottom_blob.w, bottom_blob.c, 1u, opt.blob_allocator);
-        for (int c = 0; c < bottom_blob.c; c++)
+        const Mat &bottom_blob = bottom_blobs[0];
+        for (size_t i = 0; i < top_blobs.size(); i++)
         {
-            const signed char *input = bottom_blob.channel(c);
-            signed char *output = a.channel(c);
-            for (int h = 0; h < bottom_blob.h; h++)
-            {
-                for (int w = 0; w < bottom_blob.w; w++)
-                {
-                    if (right_shift < 0)
-                    {
-                        output[w] = (input[w] * dst) >> (-right_shift);
-                    }
-                    else
-                    {
-                        output[w] = (input[w] * dst) << right_shift;
-                    }
-                }
-                input += bottom_blob.w;
-                output += bottom_blob.w;
-            }
+            top_blobs[i] = bottom_blob;
         }
-        top_blobs[0] = a;
     }
 
     return 0;

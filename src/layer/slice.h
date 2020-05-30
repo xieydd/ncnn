@@ -34,6 +34,8 @@ public:
     Mat slices;
     int axis;
     int use_int8_inference;
+    Mat scales;
+    int use_factor;
 };
 
 } // namespace ncnn
