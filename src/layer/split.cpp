@@ -1,7 +1,7 @@
 /*
  * @Author: xieydd
  * @since: 2020-05-08 10:35:56
- * @lastTime: 2020-05-30 19:52:56
+ * @lastTime: 2020-06-03 00:08:23
  * @LastAuthor: Do not edit
  * @message: 
  */
@@ -83,7 +83,7 @@ int Split::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
         int right_shift = factors[1];
         const Mat &bottom_blob = bottom_blobs[0];
 
-        for (int i = 0; i < bottom_blobs.size(); i++)
+        for (int i = 0; i < top_blobs.size(); i++)
         {
             Mat a = bottom_blobs[0].clone();
             for (int c = 0; c < bottom_blob.c; c++)
@@ -96,7 +96,18 @@ int Split::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
                     {
                         if (right_shift < 0)
                         {
-                            output[w] = (input[w] * dst) >> (-right_shift);
+                            // if (name == "splitncnn_1")
+                            // {
+                            //     output[w] = float2int8(input[w] * 1.0f * 11.196833 / 13.129980);
+                            // }
+                            // else if (name == "splitncnn_2")
+                            // {
+                            //     output[w] = float2int8(input[w] * 1.0f * 20.343714 / 21.516098);
+                            // }
+                            // else
+                            {
+                                output[w] = (input[w] * dst) >> (-right_shift);
+                            }
                         }
                         else
                         {

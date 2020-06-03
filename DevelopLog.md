@@ -1,7 +1,7 @@
 <!--
  * @Author: xieydd
  * @since: 2020-05-08 10:36:58
- * @lastTime: 2020-05-30 17:12:45
+ * @lastTime: 2020-06-03 20:16:26
  * @LastAuthor: Do not edit
  * @message: 
  -->
@@ -130,6 +130,7 @@ mbv2 result
 |原始 ncnn float 和崔鑫全量化|	0.9997271|	0.996|	 7.97|	0.17
 |原始 ncnn float 和 半量化|	0.9999787|	0.2637	|2.95	|0.023
 
+
 2020-05-26 complete mbv2 int8 quantization
 
 
@@ -140,11 +141,13 @@ out
 |  ----  | ----  | ---- | ---- | ----
 |原始 ncnn float 和 int32整体移位量化|	0.9776	|12.02|0.208|0.32
 |原始 ncnn float 和 半量化|	0.99567|	5.2599	|0.088|0.178
+|原始 ncnn float 和 全量化|	0.92324|	22.4	|0.37|0.46
 845
 |测试方案	|cosine distance|	cosine angle	|绝对误差(MAE)|相对误差 （MRE）
 |  ----  | ----  | ---- | ---- | ----
 |原始 ncnn float 和 int32整体移位量化|	0.99990	|	0.6383|0.0008|0.23
 |原始 ncnn float 和 半量化|	0.99995|	0.4399	|0.00049|0.069
+|原始 ncnn float 和 全量化|	0.99960|	1.2339	|0.00161|0.449
 
 
 2020-05-30 start full int8 quantization of shufflenetv2
@@ -155,3 +158,42 @@ out
 4. main change of ncnn2int8
     1. find all top_scale, and smallest_top_scale/real_top_scale only for slice and split
     2. storage it
+
+2020-06-02 
+优化过程结束，优化指标如下
+out
+|测试方案	|cosine distance|	cosine angle	|绝对误差（MAE）|相对误差 （MRE）
+|  ----  | ----  | ---- | ---- | ----
+|原始 ncnn float 和 int32整体移位量化|	0.9778	|11.95|0.208|0.32
+|原始 ncnn float 和 半量化|	0.99567|	5.2599	|0.088|0.178
+|原始 ncnn float 和 全量化 factor 移位|	0.9535|	17.36	|0.29|0.408
+|原始 ncnn float 和 全量化 factor float|	0.9694|	14.06	|0.24|0.36
+845
+|测试方案	|cosine distance|	cosine angle	|绝对误差(MAE)|相对误差 （MRE）| 误检
+|  ----  | ----  | ---- | ---- | ---- | ---
+|原始 ncnn float 和 int32整体移位量化|	0.99992	|	0.58|0.0008|0.23|
+|原始 ncnn float 和 半量化|	0.99995|	0.4399	|0.00049|0.069| 5
+|原始 ncnn float 和 全量化 factor 移位|	0.99987|		0.7087|0.00097|0.2856|5
+|原始 ncnn float 和 全量化 factor float|	0.99989|	0.6688	|0.0009|0.2704|5
+
+
+结果指标，非特征值
+|测试方案|绝对误差（置信度MAE）|相对误差 （置信度MRE）|误检|框 IOU>0.9
+|  ----  | ----  | ---- | ---- | ---- 
+|原始 ncnn float 和 int32整体移位量化|（集外）0.031（集内）0.003766 |（集外）0.041（集内）0.004|（集外）5（集内）0|（集外）(集外) 50/60（集内）457/500
+|原始 ncnn float 和 半量化|（集外）0.027（集内）0.018|（集外）0.036（集内）0.0018|（集外）0（集内）0|（集外）56/64（集内）494/500
+|原始 ncnn float 和 全量化|	（集外）0.045253 （集内）0.0063|（集外）0.059295 （集内）0.0066|（集外）5 （集内）0|(集外)52/60 （集内）469/500
+
+```s
+# 复现流程
+# int32
+$ git checkout scale_shift_int8_shufflenetv2
+$ 修改 quantize.h quantiize.cpp 
+$ make -j8 && ./tools/quantize/ncnn2int8_new ../../model/hand-detection-fp32.param ../../model/hand-detection-fp32.bin ../../model/hand-detection-int8.param ../../model/hand-detection-int8.bin ../../model/hand-detection.table ../../model/hand-detection-int.table
+# int8
+$ git checkout int8_shufflenetv2
+$ make -j8 && ./tools/quantize/ncnn2int8_new ../../model/hand-detection-fp32.param ../../model/hand-detection-fp32.bin ../../model/hand-detection-int8.param ../../model/hand-detection-int8.bin 
+# 半量化
+$ git checkout master
+$ make -j8 && ./tools/quantize/ncnn2int8 ../../model/hand-detection-fp32.param ../../model/hand-detection-fp32.bin ../../model/hand-detection-int8.param ../../model/hand-detection-int8.bin 
+```

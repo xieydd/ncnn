@@ -75,12 +75,10 @@ int ConvolutionDepthWise::load_model(const ModelBin &mb)
     if (int8_scale_term == 1)
     {
         scales = mb.load(group + 1, 1);
-        top_scales = mb.load(2, 1);
     }
     else if (int8_scale_term == 2)
     {
         scales = mb.load(group + 1, 1);
-        top_scales = mb.load(2, 1);
     }
 
     return 0;

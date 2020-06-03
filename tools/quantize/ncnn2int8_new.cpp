@@ -195,9 +195,9 @@ public:
     int quantize_innerproduct();
     int find_top_scale();
     void slice_factors();
-    void slice_factor(std::string layer_name, float factor);
+    void slice_factor(float factor, std::string layer_name);
     void split_factors();
-    void split_factor(std::string layer_name, float factor);
+    void split_factor(float factor, std::string layer_name);
     std::string find_first_conv(std::string name);
 
 public:
@@ -232,32 +232,60 @@ int NetQuantize::find_top_scale()
 
         if (layer->type == "Convolution" || layer->type == "ConvolutionDepthWise")
         {
+            // if (layer_name == "435" || layer_name == "443" || layer_name == "459" || layer_name == "475" || layer_name == "491")
+            // {
+            //     top_blob_int8scale_table[layer_name].push_back(10.590463);
+            // }
+            // else if (layer_name == "502" || layer_name == "510" || layer_name == "526" || layer_name == "558" || layer_name == "574" || layer_name == "590" || layer_name == "606" || layer_name == "622")
+            // {
+            //     top_blob_int8scale_table[layer_name].push_back(11.842315);
+            // }
+            // else if (layer_name == "633" || layer_name == "652" || layer_name == "657" || layer_name == "673" || layer_name == "689")
+            // {
+            //     top_blob_int8scale_table[layer_name].push_back(18.017279);
+            // }
+            // else if (layer_name == "733" || layer_name == "741" || layer_name == "749" || layer_name == "757" || layer_name == "737")
+            // {
+            //     top_blob_int8scale_table[layer_name].push_back(50.0);
+            // }
+            // else if (layer_name == "745" || layer_name == "753" || layer_name == "761")
+            // {
+            //     top_blob_int8scale_table[layer_name].push_back(10.0);
+            // }
+            // else
+            // {
+            //     std::string first_conv_name = find_first_conv(layer_name);
+            //     if (blob_int8scale_table.count(first_conv_name) > 0)
+            //     {
+            //         top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[first_conv_name][0]);
+            //     }
+            // }
             if (layer_name == "435" || layer_name == "443" || layer_name == "459" || layer_name == "475" || layer_name == "491")
             {
-                top_blob_int8scale_table[layer_name] = 10.590463;
+                top_blob_int8scale_table[layer_name].push_back(13.129980);
             }
-            else if (layer_name == "502" || layer_name == "510" || layer_name == "526" || layer_name == "558" || layer_name == "574" || layer_name == "590" || layer_name == "606" || layer_name == "622")
+            else if (layer_name == "502" || layer_name == "510" || layer_name == "526" || layer_name == "542" || layer_name == "558" || layer_name == "574" || layer_name == "590" || layer_name == "606" || layer_name == "622")
             {
-                top_blob_int8scale_table[layer_name] = 11.842315;
+                top_blob_int8scale_table[layer_name].push_back(20.343714);
             }
-            else if (layer_name == "633" || layer_name == "652" || layer_name == "657" || layer_name == "673" || layer_name == "689")
+            else if (layer_name == "633" || layer_name == "641" || layer_name == "657" || layer_name == "673" || layer_name == "689")
             {
-                top_blob_int8scale_table[layer_name] = 18.017279;
+                top_blob_int8scale_table[layer_name].push_back(21.516098);
             }
-            else if (layer_name == "733" || layer_name == "741" || layer_name == "749" || layer_name == "757" || layer_name == "737")
+            else if (layer_name == "733" || layer_name == "741" || layer_name == "749" || layer_name == "757")
             {
-                top_blob_int8scale_table[layer_name] = 50.0;
+                top_blob_int8scale_table[layer_name].push_back(7.0);
             }
-            else if (layer_name == "745" || layer_name == "753" || layer_name == "761")
+            else if (layer_name == "737" || layer_name == "745" || layer_name == "753" || layer_name == "761")
             {
-                top_blob_int8scale_table[layer_name] = 10.0;
+                top_blob_int8scale_table[layer_name].push_back(10.0);
             }
             else
             {
                 std::string first_conv_name = find_first_conv(layer_name);
                 if (blob_int8scale_table.count(first_conv_name) > 0)
                 {
-                    top_blob_int8scale_table[layer_name] = blob_int8scale_table[first_conv_name][0];
+                    top_blob_int8scale_table[layer_name].push_back(blob_int8scale_table[first_conv_name][0]);
                 }
             }
         }
@@ -333,47 +361,109 @@ void NetQuantize::slice_factors()
 
         if (layer->type == "Slice")
         {
-            switch (layer_name)
+            // if (layer_name == "452")
+            // {
+            //     slice_factor(1.0, layer_name);
+            // }
+            // else if (layer_name == "468")
+            // {
+            //     slice_factor(10.590463 / 13.129980, layer_name);
+            // }
+            // else if (layer_name == "484")
+            // {
+            //     slice_factor(10.590463 / 10.599827, layer_name);
+            // }
+            // else if (layer_name == "519")
+            // {
+            //     slice_factor(11.842315 / 14.166965, layer_name);
+            // }
+            // else if (layer_name == "535")
+            // {
+            //     slice_factor(11.842315 / 13.292026, layer_name);
+            // }
+            // else if (layer_name == "551")
+            // {
+            //     slice_factor(1.0, layer_name);
+            // }
+            // else if (layer_name == "567")
+            // {
+            //     slice_factor(11.842315 / 14.104471, layer_name);
+            // }
+            // else if (layer_name == "583")
+            // {
+            //     slice_factor(11.842315 / 12.641934, layer_name);
+            // }
+            // else if (layer_name == "599")
+            // {
+            //     slice_factor(11.842315 / 12.998467, layer_name);
+            // }
+            // else if (layer_name == "615")
+            // {
+            //     slice_factor(11.842315 / 14.082044, layer_name);
+            // }
+            // else if (layer_name == "650")
+            // {
+            //     slice_factor(18.017279 / 19.198814, layer_name);
+            // }
+            // else if (layer_name == "666")
+            // {
+            //     slice_factor(18.017279 / 21.228539, layer_name);
+            // }
+            // else if (layer_name == "682")
+            // {
+            //     slice_factor(18.017279 / 21.516098, layer_name);
+            // }
+            if (layer_name == "452")
             {
-            case '452':
+                slice_factor(10.590463 / 13.129980, layer_name);
+            }
+            else if (layer_name == "468")
+            {
                 slice_factor(1.0, layer_name);
-                break;
-            case '468'：
-                slice_factor(10.590463/13.129980, layer_name);
-                break;
-            case '484'：
-                slice_factor(10.590463/10.599827, layer_name);
-                break;
-            case '519'：
-                slice_factor(11.842315/14.166965, layer_name);
-                break;
-            case '535'：
-                slice_factor(11.842315/13.292026, layer_name);
-                break; 
-            case '551'：
+            }
+            else if (layer_name == "484")
+            {
+                slice_factor(10.599827 / 13.129980, layer_name);
+            }
+            else if (layer_name == "519")
+            {
+                slice_factor(14.166965 / 20.343714, layer_name);
+            }
+            else if (layer_name == "535")
+            {
+                slice_factor(13.292026 / 20.343714, layer_name);
+            }
+            else if (layer_name == "551")
+            {
+                slice_factor(11.842315 / 20.343714, layer_name);
+            }
+            else if (layer_name == "567")
+            {
+                slice_factor(14.104471 / 20.343714, layer_name);
+            }
+            else if (layer_name == "583")
+            {
+                slice_factor(12.641934 / 20.343714, layer_name);
+            }
+            else if (layer_name == "599")
+            {
+                slice_factor(12.998467 / 20.343714, layer_name);
+            }
+            else if (layer_name == "615")
+            {
+                slice_factor(14.082044 / 20.343714, layer_name);
+            }
+            else if (layer_name == "650")
+            {
+                slice_factor(19.198814 / 21.516098, layer_name);
+            }
+            else if (layer_name == "666")
+            {
+                slice_factor(21.228539 / 21.516098, layer_name);
+            }
+            else if (layer_name == "682")
+            {
                 slice_factor(1.0, layer_name);
-                break; 
-            case '567'：
-                slice_factor(11.842315/14.104471, layer_name);
-                break; 
-            case '583'：
-                slice_factor(11.842315/12.641934, layer_name);
-                break; 
-            case '599'：
-                slice_factor(11.842315/12.998467, layer_name);
-                break; 
-            case '615'：
-                slice_factor(11.842315/14.082044, layer_name);
-                break; 
-            case '650'：
-                slice_factor(18.017279/19.198814, layer_name);
-                break; 
-            case '666'：
-                slice_factor(11.842315/21.228539, layer_name);
-                break; 
-            case '682'：
-                slice_factor(11.842315/21.516098, layer_name);
-                break;  
             }
         }
     }
@@ -390,14 +480,23 @@ void NetQuantize::split_factors()
 
         if (layer->type == "Split")
         {
-            switch (layer_name)
+            // if (layer_name == "splitncnn_1")
+            // {
+            //     split_factor(11.196833 / 10.590463, layer_name);
+            // }
+            // else if (layer_name == "splitncnn_2")
+            // {
+            //     split_factor(20.343714 / 11.842315, layer_name);
+            // }
+            if (layer_name == "splitncnn_1")
             {
-            case 'splitncnn_1':
-                split_factor(10.590463 / 11.196833, layer_name);
-                break;
-            case 'splitncnn_2':
-                split_factor(10.590463 / 20.343714, layer_name);
-                break;
+                //split_factor(13.129980 / 11.196833, layer_name);
+                split_factor(11.196833 / 13.129980, layer_name);
+            }
+            else if (layer_name == "splitncnn_2")
+            {
+                //split_factor(21.516098 / 20.343714, layer_name);
+                split_factor(20.343714 / 21.516098, layer_name);
             }
         }
     }
@@ -406,7 +505,6 @@ void NetQuantize::split_factors()
 
 void NetQuantize::slice_factor(float factor, std::string layer_name)
 {
-    float factor;
     int Bint;
     int BitN = 7;
     int Bfrac;
@@ -416,7 +514,7 @@ void NetQuantize::slice_factor(float factor, std::string layer_name)
     factors.resize(2);
     float accuracy;
 
-    Bint = (int)(log2(factor) + 0.5);
+    Bint = (int)(log2(factor));
     Bfrac = BitN - Bint;
     accuracy = pow((float)2.0, (float)(0 - Bfrac));
     dst = int(factor / accuracy + 0.5);
@@ -424,13 +522,12 @@ void NetQuantize::slice_factor(float factor, std::string layer_name)
     factors[0] = dst;
     factors[1] = right_shift;
 
-    split_factor_table[layer_name] = factors;
+    slice_factor_table[layer_name] = factors;
     return;
 }
 
 void NetQuantize::split_factor(float factor, std::string layer_name)
 {
-    float factor;
     int Bint;
     int BitN = 7;
     int Bfrac;
@@ -440,7 +537,7 @@ void NetQuantize::split_factor(float factor, std::string layer_name)
     factors.resize(2);
     float accuracy;
 
-    Bint = (int)(log2(factor) + 0.5);
+    Bint = (int)(log2(factor));
     Bfrac = BitN - Bint;
     accuracy = pow((float)2.0, (float)(0 - Bfrac));
     dst = int(factor / accuracy + 0.5);
@@ -1839,9 +1936,9 @@ int main(int argc, char **argv)
         fprintf(stdout, "%s-%d ", name.c_str(), N);
         // for (int i = 0; i < int_scales.size(); i++)
         // {
-        //     fprintf(stdout, "%d ", int_scales[i]);
+        //     fprintf(stdout, "%d-%f-%f ", int_scales[i], result_scales[i], 1.0f * int_scales[i] / pow(2, (-N)));
         // }
-        // fprintf(stdout, "\n");
+        fprintf(stdout, "\n");
 
         // fprintf(stdout, "#######################################\n");
 
@@ -1865,11 +1962,11 @@ int main(int argc, char **argv)
         // fprintf(stdout, "\n");
     }
 
+    quantizer.slice_factors();
+    quantizer.split_factors();
     quantizer.quantize_convolution();
     quantizer.quantize_convolutiondepthwise();
     quantizer.quantize_innerproduct();
-    quantizer.quantize_slice();
-    quantizer.quantize_split();
 
     quantizer.save(outparam, outbin);
 

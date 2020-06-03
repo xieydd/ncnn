@@ -14,7 +14,15 @@
 
 #include "concat.h"
 #include <algorithm>
-
+static inline signed char float2int8(float v)
+{
+    int int32 = round(v);
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
+    return (signed char)int32;
+}
 namespace ncnn
 {
 
@@ -317,22 +325,54 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
         }
 
         Mat &top_blob = top_blobs[0];
-        const char *type_name = "output";
-        top_blob.create(w, top_h, elemsize, opt.blob_allocator);
-        if (top_blob.empty())
-            return -100;
-
-        signed char *outptr = top_blob;
-        for (size_t b = 0; b < bottom_blobs.size(); b++)
+        std::string type_name = "output";
+        std::string softmax_name = "844";
+        if (name == type_name || name == softmax_name)
         {
-            const Mat &bottom_blob = bottom_blobs[b];
+            top_blob.create(w, top_h, 4u, opt.blob_allocator);
+            if (top_blob.empty())
+                return -100;
 
-            int size = w * bottom_blob.h;
+            float *outptr = top_blob;
+            for (size_t b = 0; b < bottom_blobs.size(); b++)
+            {
+                const Mat &bottom_blob = bottom_blobs[b];
 
-            const signed char *ptr = bottom_blob;
-            memcpy(outptr, ptr, size * elemsize);
+                int size = w * bottom_blob.h;
 
-            outptr += size;
+                const signed char *ptr = bottom_blob;
+                for (int i = 0; i < size; i++)
+                {
+                    if (name == type_name)
+                    {
+                        outptr[i] = 1.0f * ptr[i] / 7.0;
+                    }
+                    else
+                    {
+                        outptr[i] = 1.0f * ptr[i] / 10.0;
+                    }
+                }
+                outptr += size;
+            }
+        }
+        else
+        {
+            top_blob.create(w, top_h, elemsize, opt.blob_allocator);
+            if (top_blob.empty())
+                return -100;
+
+            signed char *outptr = top_blob;
+            for (size_t b = 0; b < bottom_blobs.size(); b++)
+            {
+                const Mat &bottom_blob = bottom_blobs[b];
+
+                int size = w * bottom_blob.h;
+
+                const signed char *ptr = bottom_blob;
+                memcpy(outptr, ptr, size * elemsize);
+
+                outptr += size;
+            }
         }
 
         return 0;
@@ -389,23 +429,53 @@ int Concat::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> 
         }
 
         Mat &top_blob = top_blobs[0];
-        top_blob.create(w, h, top_channels, elemsize, opt.blob_allocator);
-        if (top_blob.empty())
-            return -100;
 
-        int q = 0;
-        for (size_t b = 0; b < bottom_blobs.size(); b++)
+        if (name == "692")
         {
-            const Mat &bottom_blob = bottom_blobs[b];
+            top_blob.create(w, h, top_channels, elemsize, opt.blob_allocator);
+            if (top_blob.empty())
+                return -100;
 
-            int channels = bottom_blob.c;
-            size_t size = bottom_blob.cstep * channels;
+            int channels = 0;
+            for (size_t b = 0; b < bottom_blobs.size(); b++)
+            {
+                const Mat &bottom_blob = bottom_blobs[b];
 
-            const signed char *ptr = bottom_blob;
-            signed char *outptr = top_blob.channel(q);
-            memcpy(outptr, ptr, size * elemsize);
+                int size = w * bottom_blob.h;
 
-            q += channels;
+                for (int c = 0; c < bottom_blob.c; c++)
+                {
+                    const signed char *ptr = bottom_blob.channel(c);
+                    signed char *outptr = top_blob.channel(c + channels);
+                    for (int i = 0; i < size; i++)
+                    {
+                        outptr[i] = float2int8(1.0f * ptr[i] * 18.017279 / 21.516098);
+                    }
+                    outptr += size;
+                }
+                channels += bottom_blob.c;
+            }
+        }
+        else
+        {
+            top_blob.create(w, h, top_channels, elemsize, opt.blob_allocator);
+            if (top_blob.empty())
+                return -100;
+
+            int q = 0;
+            for (size_t b = 0; b < bottom_blobs.size(); b++)
+            {
+                const Mat &bottom_blob = bottom_blobs[b];
+
+                int channels = bottom_blob.c;
+                size_t size = bottom_blob.cstep * channels;
+
+                const signed char *ptr = bottom_blob;
+                signed char *outptr = top_blob.channel(q);
+                memcpy(outptr, ptr, size * elemsize);
+
+                q += channels;
+            }
         }
 
         return 0;

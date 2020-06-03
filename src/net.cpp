@@ -1267,7 +1267,7 @@ int Net::forward_layer(int layer_index, std::vector<Mat> &blob_mats, Option &opt
             double end = get_current_time();
             benchmark(layer, bottom_blob, top_blob, start, end);
 #else
-            //fprintf(stdout, "nnnn %s\n", (layer->name).c_str());
+            // fprintf(stdout, "nnnn %s\n", (layer->name).c_str());
             int ret = layer->forward(bottom_blob, top_blob, opt);
 #endif // NCNN_BENCHMARK
             if (ret != 0)

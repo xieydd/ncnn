@@ -408,7 +408,7 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
     int outw = (w - kernel_extent_w) / stride_w + 1;
     int outh = (h - kernel_extent_h) / stride_h + 1;
 
-    // Mat m = bottom_blob_unbordered;
+    // Mat m = bottom_blob_bordered;
     // for (int c = 0; c < m.c; c++)
     // {
     //     const signed char *ptr = m.channel(c);
@@ -435,7 +435,7 @@ int Convolution_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_blob, con
         dequantize_scales.resize(num_output + 1);
         mat2vector(scales, dequantize_scales);
         int right_shift = dequantize_scales[num_output];
-        conv_im2col_sgemm_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, kernel_w, kernel_h, stride_w, stride_h, bias_data, dequantize_scales, opt, right_shift);
+        conv_im2col_sgemm_int8_dequant_sse(bottom_blob_bordered, top_blob, weight_data, kernel_w, kernel_h, stride_w, stride_h, bias_data, dequantize_scales, opt, right_shift, name);
     }
 
     // Mat m = top_blob;

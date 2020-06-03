@@ -385,6 +385,21 @@ int ConvolutionDepthWise_x86::forward_int8_x86(const Mat &bottom_blob, Mat &top_
     if (bottom_blob_bordered.empty())
         return -100;
 
+    // Mat m = bottom_blob_bordered;
+    // for (int c = 0; c < m.c; c++)
+    // {
+    //     const signed char *ptr = m.channel(c);
+    //     for (int h = 0; h < m.h; h++)
+    //     {
+    //         for (int w = 0; w < m.w; w++)
+    //         {
+    //             fprintf(stdout, "%d ", ptr[w]);
+    //         }
+    //         ptr += m.w;
+    //         fprintf(stdout, "\n");
+    //     }
+    // }
+
     w = bottom_blob_bordered.w;
     h = bottom_blob_bordered.h;
 

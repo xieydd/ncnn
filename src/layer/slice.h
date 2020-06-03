@@ -26,6 +26,7 @@ public:
     Slice();
 
     virtual int load_param(const ParamDict &pd);
+    virtual int load_model(const ModelBin &mb);
 
     virtual int forward(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const;
     virtual int forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &top_blobs, const Option &opt) const;

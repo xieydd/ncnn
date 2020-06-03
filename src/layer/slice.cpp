@@ -14,6 +14,15 @@
 
 #include "slice.h"
 
+static inline signed char float2int8(float v)
+{
+    int int32 = round(v);
+    if (int32 > 127)
+        return 127;
+    if (int32 < -127)
+        return -127;
+    return (signed char)int32;
+}
 namespace ncnn
 {
 
@@ -35,7 +44,7 @@ int Slice::load_param(const ParamDict &pd)
 
 int Slice::load_model(const ModelBin &mb)
 {
-    if (use_factor):
+    if (use_factor)
         scales = mb.load(2, 1);
     return 0;
 }
@@ -404,15 +413,68 @@ int Slice::forward_int8(const std::vector<Mat> &bottom_blobs, std::vector<Mat> &
             }
             else
             {
-                for (int i = q; i < slice + q; i++)
+                for (int c = q; c < slice + q; c++)
                 {
-                    const signed char *ptr = bottom_blob.channel(i);
-                    signed char *outptr = top_blob.channel(i);
-                    for (int j = 0; j < size; j++)
+                    const signed char *ptr = bottom_blob.channel(c);
+
+                    signed char *outptr = top_blob.channel(c - q);
+                    for (int j = 0; j < bottom_blob.h * bottom_blob.w; j++)
                     {
                         if (right_shift < 0)
                         {
-                            outptr[j] = (ptr[j] * factor) >> (-right_shift);
+                            // if (name == "452")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 0.80654);
+                            //     // outptr[j] = (ptr[j] * factor) >> (-right_shift);
+                            // }
+                            // else if (name == "484")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 10.599827 / 13.129980);
+                            // }
+                            // else if (name == "519")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 14.166965 / 20.343714);
+                            // }
+                            // else if (name == "535")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 13.292026 / 20.343714);
+                            // }
+                            // else if (name == "551")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 11.842315 / 20.343714);
+                            // }
+                            // else if (name == "567")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 14.104471 / 20.343714);
+                            // }
+                            // else if (name == "583")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 12.641934 / 20.343714);
+                            // }
+                            // else if (name == "559")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 12.998467 / 20.343714);
+                            // }
+                            // else if (name == "615")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 14.082044 / 20.343714);
+                            // }
+                            // else if (name == "650")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 19.198814 / 21.516098);
+                            // }
+                            // else if (name == "666")
+                            // {
+                            //     outptr[j] = float2int8(ptr[j] * 1.0f * 21.228539 / 21.516098);
+                            // }
+                            // else if (name == "468" || name == "682")
+                            // {
+                            //     outptr[j] = ptr[j];
+                            // }
+                            // else
+                            {
+                                outptr[j] = (ptr[j] * factor) >> (-right_shift);
+                            }
                         }
                         else
                         {

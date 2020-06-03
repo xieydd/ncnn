@@ -69,7 +69,6 @@ int Convolution::load_model(const ModelBin &mb)
     if (int8_scale_term)
     {
         scales = mb.load(num_output + 1, 1);
-        top_scales = mb.load(2, 1);
     }
 
     return 0;
